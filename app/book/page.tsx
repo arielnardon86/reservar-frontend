@@ -6,6 +6,9 @@ import { TenantProvider } from "@/lib/context/TenantContext"
 import { useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
+// Forzar renderizado dinámico (usa searchParams)
+export const dynamic = 'force-dynamic'
+
 function BookPageContent() {
   const searchParams = useSearchParams()
   const tenantId = searchParams?.get('tenantId')

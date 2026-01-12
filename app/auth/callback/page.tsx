@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/context/AuthContext"
 import { Loader2, CheckCircle2, XCircle } from "lucide-react"
@@ -8,7 +8,10 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import type { AuthUser } from "@/lib/context/AuthContext"
 
-export default function AuthCallbackPage() {
+// Forzar renderizado dinámico (no pre-renderizar en build)
+export const dynamic = 'force-dynamic'
+
+function AuthCallbackContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams?.get('token')
@@ -119,5 +122,24 @@ export default function AuthCallbackPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto" />
+              <h2 className="text-xl font-semibold">Cargando...</h2>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <AuthCallbackContent />
+    </Suspense>
   )
 }
