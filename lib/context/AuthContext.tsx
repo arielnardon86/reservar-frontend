@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 import { useRouter } from "next/navigation"
+import { authApi } from "@/lib/api/endpoints"
 
 export interface AuthUser {
   id: string
@@ -54,18 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Error al enviar magic link')
-      }
-
-      const data = await response.json()
+      const data = await authApi.login({ email })
       
       // En desarrollo, mostrar el link en consola
       if (data.magicLink) {
