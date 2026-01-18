@@ -118,7 +118,7 @@ export default function TenantLandingPage() {
                     <div className="flex-1">
                       <h3 className="font-semibold mb-2">Contacto</h3>
                       <a
-                        href={`https://wa.me/${tenant.phone.replace(/\D/g, '')}`}
+                        href={`https://wa.me/${tenant.phone.replace(/[^\d]/g, '')}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-lg font-medium hover:underline block"
