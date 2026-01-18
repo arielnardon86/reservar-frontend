@@ -311,6 +311,19 @@ export function OnboardingWizard() {
                       Usaremos este email para notificaciones y acceso al panel
                     </p>
                   </div>
+                  <PhoneInput
+                    value={data.phone || ''}
+                    onChange={(value) => updateData({ phone: value })}
+                    label="Teléfono"
+                    placeholder="11 1234-5678"
+                    countryCode="AR"
+                  />
+                  <LocationPicker
+                    value={data.address || ''}
+                    onChange={(address) => updateData({ address })}
+                    label="Dirección"
+                    placeholder="Calle, número, ciudad"
+                  />
                   <div>
                     <Label htmlFor="logo">Logo (opcional)</Label>
                     <div className="mt-2 flex items-center gap-4">
