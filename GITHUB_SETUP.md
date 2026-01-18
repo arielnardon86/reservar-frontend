@@ -285,3 +285,4 @@ git ls-files  # Ver todos los archivos trackeados
 
 **¿Listo para subir? Empieza con el frontend y luego el backend.** 🚀
 
+

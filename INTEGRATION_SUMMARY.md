@@ -243,3 +243,4 @@ const { tenant, setTenant } = useTenantContext()
 
 Ahora puedes usar los hooks en cualquier componente para interactuar con el backend.
 
+

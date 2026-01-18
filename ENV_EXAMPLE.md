@@ -16,3 +16,4 @@ NEXT_PUBLIC_FRONTEND_URL=http://localhost:3000
 - Las variables que empiezan con `NEXT_PUBLIC_` son accesibles desde el cliente
 - Asegúrate de que el backend esté corriendo en el puerto 3001
 
+

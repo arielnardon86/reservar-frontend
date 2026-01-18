@@ -13,6 +13,8 @@ import { toast } from "sonner"
 import { useTenantContext } from "@/lib/context/TenantContext"
 import { useTenant, useUpdateTenant } from "@/lib/api/hooks"
 import type { UpdateTenantDto } from "@/lib/api/types"
+import { PhoneInput } from "@/components/ui/phone-input"
+import { LocationPicker } from "@/components/ui/location-picker"
 
 export function SettingsPanel() {
   const { tenantId } = useTenantContext()
@@ -168,15 +170,13 @@ export function SettingsPanel() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Teléfono</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone || ''}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+54 11 1234-5678"
-                  />
-                </div>
+                <PhoneInput
+                  value={formData.phone || ''}
+                  onChange={(value) => setFormData({ ...formData, phone: value })}
+                  label="Teléfono"
+                  placeholder="11 1234-5678"
+                  countryCode="AR"
+                />
                 <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
                   <Input
@@ -188,18 +188,12 @@ export function SettingsPanel() {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Dirección</Label>
-                <Input
-                  id="address"
-                  value={formData.address || ''}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="Calle, número, ciudad"
-                />
-                <p className="text-xs text-gray-500">
-                  Se mostrará en la landing con enlace a Google Maps
-                </p>
-              </div>
+              <LocationPicker
+                value={formData.address || ''}
+                onChange={(address) => setFormData({ ...formData, address })}
+                label="Dirección"
+                placeholder="Calle, número, ciudad"
+              />
 
               <Button
                 onClick={handleSaveGeneral}

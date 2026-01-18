@@ -66,3 +66,4 @@ http://localhost:3000/onboarding
 - **Para probar el admin**: Ve a `http://localhost:3000/admin/dashboard`
 - **Para ver el onboarding**: Ve a `http://localhost:3000/onboarding`
 
+

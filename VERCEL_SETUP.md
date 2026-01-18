@@ -152,3 +152,4 @@ Puedes verificar que las variables están configuradas correctamente:
 
 **¿Necesitas ayuda para desplegar el backend primero?** Ver `DEPLOYMENT_STRATEGY.md` para la guía completa.
 
+

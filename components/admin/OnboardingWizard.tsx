@@ -23,6 +23,8 @@ import {
 import { toast } from "sonner"
 import { useCreateTenant, useCreateService, useCreateProfessional, useCreateSchedule } from "@/lib/api/hooks"
 import { useRouter } from "next/navigation"
+import { PhoneInput } from "@/components/ui/phone-input"
+import { LocationPicker } from "@/components/ui/location-picker"
 
 type OnboardingStep = 
   | "welcome"
@@ -36,6 +38,8 @@ type OnboardingStep =
 interface OnboardingData {
   businessName: string
   email: string
+  phone?: string
+  address?: string
   logoUrl?: string
   primaryColor: string
   secondaryColor: string
@@ -121,6 +125,8 @@ export function OnboardingWizard() {
         slug: tenantSlug,
         name: data.businessName,
         email: data.email,
+        phone: data.phone,
+        address: data.address,
         primaryColor: data.primaryColor,
         secondaryColor: data.secondaryColor,
         logoUrl: data.logoUrl,

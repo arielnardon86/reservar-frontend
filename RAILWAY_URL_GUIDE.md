@@ -98,3 +98,4 @@ await app.listen(port, '0.0.0.0');
 3. Busca el log: `[API Client] Base URL configurada:`
 4. Debe mostrar tu URL de Railway, no localhost
 
+
