@@ -36,16 +36,6 @@ export default function TenantLandingPage() {
     )
   }
 
-  // Debug: verificar qué datos tiene el tenant
-  useEffect(() => {
-    console.log('🏢 Tenant data:', {
-      name: tenant.name,
-      phone: tenant.phone,
-      address: tenant.address,
-      hasAddress: !!tenant.address,
-    })
-  }, [tenant])
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header con más protagonismo para logo y nombre */}

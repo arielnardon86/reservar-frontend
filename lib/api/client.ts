@@ -55,10 +55,17 @@ class ApiClient {
     };
 
     // Agregar tenant ID si está disponible
+    // Los endpoints públicos (como /tenants/slug/:slug) no requieren tenantId
+    const isPublicEndpoint = endpoint.includes('/tenants/slug/') || 
+                             endpoint.includes('/tenants?') ||
+                             endpoint === '/tenants' && options.method === 'GET' ||
+                             endpoint.includes('/auth/');
+    
     if (this.tenantId) {
       (headers as Record<string, string>)['x-tenant-id'] = this.tenantId;
       console.log('[API Client] Sending request with tenantId:', this.tenantId, 'to:', url);
-    } else {
+    } else if (!isPublicEndpoint) {
+      // Solo mostrar warning si no es un endpoint público
       console.warn('[API Client] No tenantId set for request to:', url);
     }
 
