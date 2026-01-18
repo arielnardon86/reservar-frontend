@@ -129,21 +129,24 @@ export function BookingConfirmation({
         
         // Invalidar TODAS las queries de disponibilidad (incluye tenantSlug y query en la key)
         // Esto asegura que cualquier fecha/profesional/servicio se refresque
-        queryClient.invalidateQueries({ 
+        await queryClient.invalidateQueries({ 
           queryKey: ['availability'],
           exact: false, // Invalidar todas las queries que empiecen con 'availability'
         })
         
         // También refetch inmediatamente las queries activas de availability
-        queryClient.refetchQueries({
+        await queryClient.refetchQueries({
           queryKey: ['availability'],
           exact: false,
+          type: 'active', // Solo refetch queries activas
         })
         
         // Invalidar cache de appointments también
-        queryClient.invalidateQueries({ 
+        await queryClient.invalidateQueries({ 
           queryKey: ['appointments'],
         })
+        
+        console.log('[BookingConfirmation] Cache invalidated and refetched')
       } catch (error: any) {
         console.error('[BookingConfirmation] Error creating appointment:', error)
         

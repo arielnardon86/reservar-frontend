@@ -338,6 +338,8 @@ export const useAvailability = (tenantSlug: string | null, query: AvailabilityQu
     queryKey: ['availability', tenantSlug, query],
     queryFn: () => appointmentsApi.getAvailability(tenantSlug!, query!),
     enabled: !!tenantSlug && !!query,
+    staleTime: 0, // Siempre considerar los datos como stale para forzar refetch
+    gcTime: 0, // No cachear (gcTime reemplaza a cacheTime en React Query v5)
   });
 };
 

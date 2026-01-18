@@ -68,7 +68,7 @@ export function DateTimeSelection({
       }
     : null
 
-  const { data: availability, isLoading: loadingAvailability, error: availabilityError } = useAvailability(
+  const { data: availability, isLoading: loadingAvailability, error: availabilityError, refetch: refetchAvailability } = useAvailability(
     tenantSlug || tenant?.slug || null,
     availabilityQuery
   )
@@ -86,6 +86,18 @@ export function DateTimeSelection({
       console.error('❌ Availability error:', availabilityError)
     }
   }, [availability, availabilityError])
+  
+  // Refetch availability cuando cambia la fecha (para asegurar datos frescos)
+  useEffect(() => {
+    if (availabilityQuery?.date && (tenantSlug || tenant?.slug)) {
+      // Refetch después de un pequeño delay para asegurar que el backend haya procesado cambios
+      const timer = setTimeout(() => {
+        console.log('🔄 Refetching availability for date:', availabilityQuery.date)
+        refetchAvailability()
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [availabilityQuery?.date, refetchAvailability, tenantSlug, tenant?.slug])
 
   // Obtener slots disponibles
   // El backend retorna un array directamente de TimeSlot[]
