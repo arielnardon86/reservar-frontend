@@ -30,9 +30,24 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     // Normalizar URL: eliminar doble slash y asegurar formato correcto
-    const normalizedBaseUrl = this.baseUrl.replace(/\/+$/, ''); // Eliminar trailing slashes
+    let normalizedBaseUrl = this.baseUrl.trim().replace(/\/+$/, ''); // Eliminar trailing slashes y espacios
+    
+    // Si la baseUrl está vacía o es solo '/', usar localhost por defecto
+    if (!normalizedBaseUrl || normalizedBaseUrl === '/') {
+      normalizedBaseUrl = 'http://localhost:3001';
+      console.warn('[API Client] Base URL vacía o inválida, usando localhost por defecto');
+    }
+    
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const url = `${normalizedBaseUrl}${normalizedEndpoint}`;
+    
+    // Construir URL y eliminar cualquier doble slash (excepto después de '://')
+    let url = `${normalizedBaseUrl}${normalizedEndpoint}`;
+    url = url.replace(/([^:]\/)\/+/g, '$1'); // Reemplazar múltiples slashes con uno solo (excepto después de ':')
+    
+    // Log para debugging
+    if (url.includes('//') && !url.includes('://')) {
+      console.error('[API Client] ⚠️ URL mal formada detectada:', url);
+    }
     
     const headers: HeadersInit = {
       'Content-Type': 'application/json',

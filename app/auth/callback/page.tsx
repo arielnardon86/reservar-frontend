@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/context/AuthContext"
+import { authApi } from "@/lib/api/endpoints"
 import { Loader2, CheckCircle2, XCircle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -28,20 +29,7 @@ function AuthCallbackContent() {
       }
 
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/callback?token=${token}`,
-          {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-          }
-        )
-
-        if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.message || 'Token inválido o expirado')
-        }
-
-        const data = await response.json()
+        const data = await authApi.verifyToken(token)
         
         if (data.user) {
           // Actualizar el estado del usuario en el contexto
