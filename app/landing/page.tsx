@@ -2,12 +2,24 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Check, Calendar, Users, TrendingUp, ArrowRight, Star } from "lucide-react"
+import { Check, Calendar, Users, TrendingUp, ArrowRight, Star, LogIn } from "lucide-react"
 import Link from "next/link"
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Header con acceso admin */}
+      <header className="container mx-auto px-4 py-4">
+        <div className="flex justify-end">
+          <Link href="/login">
+            <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+              <LogIn className="w-4 h-4 mr-2" />
+              Soy Admin
+            </Button>
+          </Link>
+        </div>
+      </header>
+
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20">
         <div className="max-w-4xl mx-auto text-center">
@@ -18,16 +30,21 @@ export default function LandingPage() {
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Reduce llamadas telefónicas, aumenta tu ocupación y profesionaliza tu negocio con nuestro sistema de turnos online.
           </p>
-          <div className="flex gap-4 justify-center">
-            <Link href="/onboarding">
-              <Button size="lg" className="text-lg px-8 py-6">
-                Comenzar gratis
-                <ArrowRight className="ml-2 w-5 h-5" />
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex gap-4 justify-center">
+              <Link href="/onboarding">
+                <Button size="lg" className="text-lg px-8 py-6">
+                  Comenzar gratis
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+              </Link>
+              <Button size="lg" variant="outline" className="text-lg px-8 py-6">
+                Ver demo
               </Button>
+            </div>
+            <Link href="/login" className="text-sm text-gray-500 hover:text-gray-700 transition-colors mt-2">
+              ¿Ya eres administrador? <span className="text-blue-600 font-medium">Iniciar sesión</span>
             </Link>
-            <Button size="lg" variant="outline" className="text-lg px-8 py-6">
-              Ver demo
-            </Button>
           </div>
         </div>
       </section>
@@ -134,4 +151,5 @@ export default function LandingPage() {
     </div>
   )
 }
+
 
