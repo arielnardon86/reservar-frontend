@@ -248,7 +248,15 @@ export function BookingConfirmation({
         </div>
         <h2 className="text-2xl font-bold mb-2 text-red-600">Error</h2>
         <p className="text-gray-600 mb-4">{error}</p>
-        <Button onClick={onNewBooking}>Intentar de Nuevo</Button>
+        <Button 
+          onClick={onNewBooking}
+          style={{
+            backgroundColor: tenant?.primaryColor || '#3b82f6',
+            color: 'white',
+          }}
+        >
+          Intentar de Nuevo
+        </Button>
       </div>
     )
   }
@@ -359,11 +367,26 @@ export function BookingConfirmation({
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <Button variant="outline" className="flex-1 gap-2" onClick={downloadCalendar}>
+        <Button 
+          variant="outline" 
+          className="flex-1 gap-2" 
+          onClick={downloadCalendar}
+          style={{
+            borderColor: tenant?.primaryColor || '#3b82f6',
+            color: tenant?.primaryColor || '#3b82f6',
+          }}
+        >
           <Download className="w-4 h-4" />
           Agregar al Calendario
         </Button>
-        <Button onClick={onNewBooking} className="flex-1">
+        <Button 
+          onClick={onNewBooking} 
+          className="flex-1"
+          style={{
+            backgroundColor: tenant?.primaryColor || '#3b82f6',
+            color: 'white',
+          }}
+        >
           Reservar Otro Turno
         </Button>
       </div>

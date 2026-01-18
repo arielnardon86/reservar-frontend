@@ -10,11 +10,12 @@ import { useAvailability } from "@/lib/api/hooks"
 import { useTenantContext } from "@/lib/context/TenantContext"
 import { useParams } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
-import type { Service, Professional } from "@/lib/api/types"
+import type { Service, Professional, Tenant } from "@/lib/api/types"
 
 interface DateTimeSelectionProps {
   service: Service
   professional: Professional
+  tenant?: Tenant | null
   onSelect: (date: Date, time: string) => void
   onBack: () => void
 }
@@ -22,13 +23,16 @@ interface DateTimeSelectionProps {
 export function DateTimeSelection({
   service,
   professional,
+  tenant: tenantProp,
   onSelect,
   onBack,
 }: DateTimeSelectionProps) {
   const params = useParams()
   const tenantSlug = params?.tenantSlug as string
-  const { tenant } = useTenantContext()
+  const { tenant: tenantFromContext } = useTenantContext()
   const queryClient = useQueryClient()
+  // Usar tenant de prop o del contexto
+  const tenant = tenantProp || tenantFromContext
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [selectedTime, setSelectedTime] = useState<string>()
   
@@ -136,7 +140,14 @@ export function DateTimeSelection({
 
   return (
     <div>
-      <Button variant="ghost" onClick={onBack} className="mb-4 gap-2">
+      <Button 
+        variant="ghost" 
+        onClick={onBack} 
+        className="mb-4 gap-2"
+        style={{
+          color: tenant?.primaryColor || '#3b82f6',
+        }}
+      >
         <ArrowLeft className="w-4 h-4" />
         Volver
       </Button>
@@ -190,6 +201,17 @@ export function DateTimeSelection({
                   variant={selectedTime === time ? "default" : "outline"}
                   onClick={() => setSelectedTime(time)}
                   className="w-full"
+                  style={
+                    selectedTime === time
+                      ? {
+                          backgroundColor: tenant?.primaryColor || '#3b82f6',
+                          color: 'white',
+                          borderColor: tenant?.primaryColor || '#3b82f6',
+                        }
+                      : {
+                          borderColor: tenant?.primaryColor ? `${tenant.primaryColor}40` : undefined,
+                        }
+                  }
                 >
                   {time}
                 </Button>
@@ -205,6 +227,10 @@ export function DateTimeSelection({
           onClick={handleContinue}
           disabled={!selectedDate || !selectedTime}
           size="lg"
+          style={{
+            backgroundColor: tenant?.primaryColor || '#3b82f6',
+            color: 'white',
+          }}
         >
           Continuar
         </Button>

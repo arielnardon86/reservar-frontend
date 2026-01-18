@@ -4,13 +4,14 @@ import { useServices } from "@/lib/api/hooks"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, DollarSign, Loader2 } from "lucide-react"
-import type { Service } from "@/lib/api/types"
+import type { Service, Tenant } from "@/lib/api/types"
 
 interface ServiceSelectionProps {
+  tenant?: Tenant | null
   onSelect: (service: Service) => void
 }
 
-export function ServiceSelection({ onSelect }: ServiceSelectionProps) {
+export function ServiceSelection({ tenant, onSelect }: ServiceSelectionProps) {
   const { data: services, isLoading } = useServices()
 
   if (isLoading) {
@@ -48,7 +49,17 @@ export function ServiceSelection({ onSelect }: ServiceSelectionProps) {
         {activeServices.map((service) => (
           <Card
             key={service.id}
-            className="cursor-pointer hover:shadow-lg transition-all hover:scale-105 border-2 hover:border-blue-500"
+            className="cursor-pointer hover:shadow-lg transition-all hover:scale-105 border-2"
+            style={{
+              borderColor: 'transparent',
+              '--hover-border-color': tenant?.primaryColor || '#3b82f6',
+            } as React.CSSProperties & { '--hover-border-color': string }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = tenant?.primaryColor || '#3b82f6'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'transparent'
+            }}
             onClick={() => onSelect(service)}
           >
             <CardContent className="p-6">
@@ -69,7 +80,10 @@ export function ServiceSelection({ onSelect }: ServiceSelectionProps) {
                 </div>
                 
                 {service.price && (
-                  <div className="flex items-center gap-1 font-semibold text-blue-600">
+                  <div 
+                    className="flex items-center gap-1 font-semibold"
+                    style={{ color: tenant?.primaryColor || '#3b82f6' }}
+                  >
                     <DollarSign className="w-4 h-4" />
                     <span>${Number(service.price).toLocaleString()}</span>
                   </div>

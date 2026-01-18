@@ -308,15 +308,69 @@ export function OnboardingWizard() {
                   <div>
                     <Label htmlFor="logo">Logo (opcional)</Label>
                     <div className="mt-2 flex items-center gap-4">
-                      <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center">
+                      <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
                         {data.logoUrl ? (
                           <img src={data.logoUrl} alt="Logo" className="w-full h-full object-cover rounded-lg" />
                         ) : (
                           <Building2 className="w-8 h-8 text-gray-400" />
                         )}
                       </div>
-                      <Button variant="outline">Subir Logo</Button>
+                      <div className="flex flex-col gap-2">
+                        <Input
+                          id="logo"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              // Validar tamaño (max 5MB)
+                              if (file.size > 5 * 1024 * 1024) {
+                                toast.error('La imagen es demasiado grande. Máximo 5MB')
+                                return
+                              }
+                              // Validar tipo
+                              if (!file.type.startsWith('image/')) {
+                                toast.error('Por favor selecciona un archivo de imagen')
+                                return
+                              }
+                              // Convertir a base64
+                              const reader = new FileReader()
+                              reader.onloadend = () => {
+                                const base64String = reader.result as string
+                                updateData({ logoUrl: base64String })
+                                toast.success('Logo cargado exitosamente')
+                              }
+                              reader.onerror = () => {
+                                toast.error('Error al cargar la imagen')
+                              }
+                              reader.readAsDataURL(file)
+                            }
+                          }}
+                        />
+                        <Button
+                          variant="outline"
+                          type="button"
+                          onClick={() => document.getElementById('logo')?.click()}
+                        >
+                          {data.logoUrl ? 'Cambiar Logo' : 'Subir Logo'}
+                        </Button>
+                        {data.logoUrl && (
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            size="sm"
+                            onClick={() => updateData({ logoUrl: undefined })}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            Eliminar
+                          </Button>
+                        )}
+                      </div>
                     </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Formatos: JPG, PNG, GIF. Tamaño máximo: 5MB
+                    </p>
                   </div>
                 </div>
                 <div className="flex justify-between pt-6">

@@ -6,16 +6,18 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import type { Service, Professional } from "@/lib/api/types"
+import type { Service, Professional, Tenant } from "@/lib/api/types"
 
 interface ProfessionalSelectionProps {
   service: Service
+  tenant?: Tenant | null
   onSelect: (professional: Professional) => void
   onBack: () => void
 }
 
 export function ProfessionalSelection({
   service,
+  tenant,
   onSelect,
   onBack,
 }: ProfessionalSelectionProps) {
@@ -36,7 +38,14 @@ export function ProfessionalSelection({
 
   return (
     <div>
-      <Button variant="ghost" onClick={onBack} className="mb-4 gap-2">
+      <Button 
+        variant="ghost" 
+        onClick={onBack} 
+        className="mb-4 gap-2"
+        style={{
+          color: tenant?.primaryColor || '#3b82f6',
+        }}
+      >
         <ArrowLeft className="w-4 h-4" />
         Volver
       </Button>
@@ -62,7 +71,16 @@ export function ProfessionalSelection({
             return (
               <Card
                 key={professional.id}
-                className="cursor-pointer hover:shadow-lg transition-all hover:scale-105 border-2 hover:border-blue-500"
+                className="cursor-pointer hover:shadow-lg transition-all hover:scale-105 border-2"
+                style={{
+                  borderColor: 'transparent',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = tenant?.primaryColor || '#3b82f6'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'transparent'
+                }}
                 onClick={() => onSelect(professional)}
               >
                 <CardContent className="p-6">

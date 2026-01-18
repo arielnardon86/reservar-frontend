@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft } from "lucide-react"
+import type { Tenant } from "@/lib/api/types"
 
 interface ClientInfoFormProps {
+  tenant?: Tenant | null
   onSubmit: (name: string, lastName: string, email: string) => void
   onBack: () => void
 }
 
-export function ClientInfoForm({ onSubmit, onBack }: ClientInfoFormProps) {
+export function ClientInfoForm({ tenant, onSubmit, onBack }: ClientInfoFormProps) {
   const [name, setName] = useState("")
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
@@ -27,7 +29,14 @@ export function ClientInfoForm({ onSubmit, onBack }: ClientInfoFormProps) {
 
   return (
     <div>
-      <Button variant="ghost" onClick={onBack} className="mb-4 gap-2">
+      <Button 
+        variant="ghost" 
+        onClick={onBack} 
+        className="mb-4 gap-2"
+        style={{
+          color: tenant?.primaryColor || '#3b82f6',
+        }}
+      >
         <ArrowLeft className="w-4 h-4" />
         Volver
       </Button>
@@ -77,11 +86,21 @@ export function ClientInfoForm({ onSubmit, onBack }: ClientInfoFormProps) {
           </p>
         </div>
 
-        <Button type="submit" disabled={!isValid} className="w-full" size="lg">
+        <Button 
+          type="submit" 
+          disabled={!isValid} 
+          className="w-full" 
+          size="lg"
+          style={{
+            backgroundColor: tenant?.primaryColor || '#3b82f6',
+            color: 'white',
+          }}
+        >
           Confirmar Turno
         </Button>
       </form>
     </div>
   )
 }
+
 
