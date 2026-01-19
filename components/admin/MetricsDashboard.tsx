@@ -244,7 +244,7 @@ export function MetricsDashboard() {
             <CardTitle className="text-sm font-medium text-gray-600">
               Facturación del Mes
             </CardTitle>
-            <DollarSign className="w-4 h-4 text-green-600" />
+            <DollarSign className="w-4 h-4" style={{ color: '#C73870' }} />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
