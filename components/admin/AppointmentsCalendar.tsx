@@ -238,7 +238,7 @@ export function AppointmentsCalendar() {
       case AppointmentStatus.CANCELLED:
         return "bg-red-50 border-red-200"
       case AppointmentStatus.COMPLETED:
-        return "" // Se maneja con estilo inline para el color Slolia
+        return "" // Se maneja con estilo inline para el color slotia
       default:
         return "bg-gray-50 border-gray-200"
     }

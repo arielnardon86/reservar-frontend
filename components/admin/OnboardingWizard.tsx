@@ -257,7 +257,7 @@ export function OnboardingWizard() {
                   <CheckCircle2 className="w-10 h-10" style={{ color: '#6E52FF' }} />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold mb-2">¡Bienvenido a Slolia!</h2>
+                  <h2 className="text-3xl font-bold mb-2">¡Bienvenido a slotia!</h2>
                   <p className="text-gray-600 text-lg">
                     En menos de 10 minutos tendrás tu turnero funcionando
                   </p>

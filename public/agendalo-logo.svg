@@ -20,7 +20,7 @@
     <path d="M18 30 L24 36 L32 24" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   </g>
   
-  <!-- Brand text "Slolia" -->
-  <text x="50" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="600" fill="#1D1C2C">Slolia</text>
+  <!-- Brand text "slotia" -->
+  <text x="50" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="600" fill="#1D1C2C">slotia</text>
 </svg>
 
