@@ -8,13 +8,13 @@ import Link from "next/link"
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header con logo Slolia y acceso admin */}
+      {/* Header con logo slotia y acceso admin */}
       <header className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
             <img 
               src="/agendalo-logo.svg" 
-              alt="Slolia" 
+              alt="slotia" 
               className="h-12 w-auto"
             />
           </Link>
