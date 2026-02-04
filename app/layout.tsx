@@ -8,8 +8,8 @@ import { AuthProvider } from "@/lib/context/AuthContext"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "slotia - Gestión de Turnos Online",
-  description: "Sistema profesional de gestión de turnos online",
+  title: "ReservAr - Reservas de espacios comunes",
+  description: "Reservá SUM, gimnasio, parrillas y más. Espacios comunes para edificios y condominios.",
 }
 
 export default function RootLayout({

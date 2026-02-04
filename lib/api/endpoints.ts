@@ -112,10 +112,10 @@ export const appointmentsApi = {
   getAvailability: (tenantSlug: string, query: AvailabilityQuery) => {
     const params = new URLSearchParams({
       tenantSlug,
-      professionalId: query.professionalId,
       serviceId: query.serviceId,
       date: query.date,
     });
+    if (query.professionalId) params.set('professionalId', query.professionalId);
     return apiClient.get<TimeSlot[]>(`/appointments/availability?${params.toString()}`);
   },
   // Público: Obtener appointments del día (para visualización)
@@ -130,9 +130,8 @@ export const appointmentsApi = {
 
 export const authApi = {
   login: (data: LoginDto) =>
-    apiClient.post<{ message: string; magicLink?: string }>('/auth/login', data),
+    apiClient.post<AuthResponse>('/auth/login', data),
   verifyToken: (token: string) => {
-    // El backend espera el token como query parameter en GET /auth/callback
     return apiClient.get<AuthResponse>(`/auth/callback?token=${token}`);
   },
 };

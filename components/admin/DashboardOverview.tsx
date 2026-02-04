@@ -137,13 +137,13 @@ export function DashboardOverview() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Turnos Hoy
+              Reservas hoy
             </CardTitle>
-            <Calendar className="w-4 h-4 text-blue-600" />
+            <Calendar className="w-4 h-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{todayAppointments}</div>
-            <p className="text-xs text-gray-500 mt-1">Turnos programados para hoy</p>
+            <p className="text-xs text-gray-500 mt-1">Reservas programadas para hoy</p>
           </CardContent>
         </Card>
 
@@ -195,7 +195,7 @@ export function DashboardOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Turnos por Día (Esta Semana)</CardTitle>
+            <CardTitle>Reservas por día (esta semana)</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -236,7 +236,7 @@ export function DashboardOverview() {
       {/* Recent Appointments */}
       <Card>
         <CardHeader>
-          <CardTitle>Últimos Turnos</CardTitle>
+          <CardTitle>Últimas reservas</CardTitle>
         </CardHeader>
         <CardContent>
           {recentAppointments.length === 0 ? (

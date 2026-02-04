@@ -2,250 +2,192 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Check, Calendar, Users, TrendingUp, ArrowRight, Star, LogIn, Zap, Shield } from "lucide-react"
+import { Check, Calendar, Building2, Clock, ArrowRight, Sparkles, LogIn, Users, CalendarDays } from "lucide-react"
 import Link from "next/link"
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a12]">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
-      <header className="container mx-auto px-4 py-6">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0a4d8c] to-[#1a6fc2] flex items-center justify-center shadow-lg border border-blue-700/30">
-              <span className="text-xl">🎾</span>
-            </div>
-            <span className="font-bold text-white text-lg">PadelTurn</span>
-          </Link>
-          <Link href="/login">
-            <Button variant="ghost" size="sm" className="text-blue-200/70 hover:text-white hover:bg-blue-900/30">
-              <LogIn className="w-4 h-4 mr-2" />
-              Soy Admin
-            </Button>
-          </Link>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 relative">
-        {/* Background decoration - court lines */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 bottom-0 left-1/2 w-px bg-[#0a4d8c]/10" />
-          <div className="absolute left-0 right-0 top-1/2 h-px bg-[#0a4d8c]/10" />
-        </div>
-        
-        {/* Paleta y pelota animadas */}
-        <div className="absolute top-16 right-16 md:right-32">
-          {/* Paleta */}
-          <div className="relative w-20 h-32 animate-[swing_2s_ease-in-out_infinite] origin-bottom">
-            <svg viewBox="0 0 80 140" className="w-full h-full drop-shadow-lg">
-              {/* Mango */}
-              <rect x="32" y="90" width="16" height="50" rx="4" fill="#1a1a2e" />
-              <rect x="34" y="92" width="12" height="46" rx="3" fill="#2a2a3e" />
-              {/* Grip lines */}
-              <line x1="34" y1="100" x2="46" y2="100" stroke="#0a4d8c" strokeWidth="2" />
-              <line x1="34" y1="110" x2="46" y2="110" stroke="#0a4d8c" strokeWidth="2" />
-              <line x1="34" y1="120" x2="46" y2="120" stroke="#0a4d8c" strokeWidth="2" />
-              <line x1="34" y1="130" x2="46" y2="130" stroke="#0a4d8c" strokeWidth="2" />
-              {/* Cabeza de la paleta */}
-              <ellipse cx="40" cy="45" rx="38" ry="44" fill="#0a4d8c" />
-              <ellipse cx="40" cy="45" rx="34" ry="40" fill="#1a6fc2" />
-              {/* Agujeros */}
-              {[...Array(5)].map((_, row) => (
-                [...Array(4)].map((_, col) => (
-                  <circle 
-                    key={`${row}-${col}`}
-                    cx={18 + col * 15} 
-                    cy={20 + row * 14} 
-                    r="4" 
-                    fill="#0a0a12"
-                    opacity="0.6"
-                  />
-                ))
-              ))}
-              {/* Borde highlight */}
-              <ellipse cx="40" cy="45" rx="34" ry="40" fill="none" stroke="#ccff00" strokeWidth="2" opacity="0.3" />
-            </svg>
-          </div>
-          {/* Pelota */}
-          <div className="absolute -left-4 top-8 w-8 h-8 rounded-full bg-[#ccff00] shadow-lg shadow-[#ccff00]/40 animate-[bounce_2s_ease-in-out_infinite]">
-            {/* Línea de la pelota */}
-            <div className="absolute inset-1 rounded-full border-2 border-[#b8e600] opacity-50" style={{ clipPath: 'polygon(30% 0%, 70% 0%, 60% 100%, 40% 100%)' }} />
-          </div>
-        </div>
-        
-        {/* Segunda pelota decorativa */}
-        <div className="absolute bottom-20 left-20 w-6 h-6 rounded-full bg-[#ccff00]/30 blur-sm animate-pulse" />
-        
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0a4d8c]/20 border border-blue-900/30 mb-8">
-            <div className="w-2 h-2 rounded-full bg-[#ccff00] animate-pulse" />
-            <span className="text-sm text-blue-200/70">Sistema de turnos para canchas de pádel</span>
-          </div>
-          
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 text-white leading-tight">
-            Gestiona tu club de pádel
-            <span className="text-[#ccff00]"> en minutos</span>
-          </h1>
-          <p className="text-xl text-blue-200/60 mb-10 max-w-2xl mx-auto">
-            Reduce llamadas telefónicas, visualiza todas las canchas de un vistazo y permite que tus clientes reserven 24/7.
-          </p>
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex gap-4 justify-center">
-              <Link href="/onboarding">
-                <Button 
-                  size="lg" 
-                  className="text-lg px-8 py-6 bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a0a12] font-bold shadow-lg shadow-[#ccff00]/20"
-                >
-                  Comenzar gratis
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
-              <Link href="/padel-club">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-blue-900/40 text-blue-200/70 hover:bg-blue-900/20 hover:text-white">
-                  Ver demo
-                </Button>
-              </Link>
-            </div>
-            <Link href="/login" className="text-sm text-blue-300/50 hover:text-white transition-colors mt-2">
-              ¿Ya eres administrador? <span className="text-[#ccff00] font-medium">Iniciar sesión</span>
+      <header className="border-b border-slate-800/50 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center group-hover:bg-emerald-500/30 transition-colors">
+                <CalendarDays className="w-5 h-5 text-emerald-400" />
+              </div>
+              <span className="font-bold text-white text-xl tracking-tight">Reserv<span className="text-emerald-400">Ar</span></span>
+            </Link>
+            <Link href="/login">
+              <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-slate-800">
+                <LogIn className="w-4 h-4 mr-2" />
+                Panel admin
+              </Button>
             </Link>
           </div>
         </div>
+      </header>
+
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(16,185,129,0.15),transparent)]" />
+        <div className="absolute top-24 right-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-slate-700/10 rounded-full blur-3xl" />
+        
+        <div className="container mx-auto px-4 py-20 md:py-28 relative z-10">
+          <div className="max-w-3xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700/50 mb-8">
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span className="text-sm text-slate-300">Espacios comunes para edificios y condominios</span>
+            </div>
+            
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white leading-tight tracking-tight">
+              Que tu consorcio
+              <span className="text-emerald-400"> reserve en un click</span>
+            </h1>
+            <p className="text-lg md:text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+              SUM, gimnasio, parrillas y más. Los administradores configuran los espacios; los vecinos reservan online, sin llamados ni planillas.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link href="/suscripcion">
+                <Button 
+                  size="lg" 
+                  className="w-full sm:w-auto text-base px-8 py-6 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl shadow-lg shadow-emerald-500/20"
+                >
+                  Suscribirme
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
+              </Link>
+              <Link href="/login">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto text-base px-8 py-6 border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl">
+                  Ya tengo cuenta
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
       </section>
 
-      {/* Benefits Section */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          <Card className="bg-[#12121f] border-blue-900/30 hover:border-[#ccff00]/20 transition-all">
-            <CardContent className="p-6">
-              <div className="w-12 h-12 rounded-xl bg-[#0a4d8c]/30 flex items-center justify-center mb-4">
-                <Calendar className="w-6 h-6 text-[#ccff00]" />
+      {/* Espacios preview */}
+      <section className="border-y border-slate-800/50 bg-slate-900/30 py-12">
+        <div className="container mx-auto px-4">
+          <p className="text-center text-slate-500 text-sm uppercase tracking-widest mb-6">Espacios que podés ofrecer</p>
+          <div className="flex flex-wrap justify-center gap-4 md:gap-8">
+            {[
+              { label: "SUM", icon: "🏠" },
+              { label: "Gimnasio", icon: "💪" },
+              { label: "Parrilla", icon: "🍖" },
+              { label: "Salón de eventos", icon: "🎉" },
+              { label: "Quincho", icon: "🌳" },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center gap-3 px-5 py-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-300"
+              >
+                <span className="text-2xl">{item.icon}</span>
+                <span className="font-medium">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits */}
+      <section className="container mx-auto px-4 py-20">
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 text-white">
+          Para administradores y vecinos
+        </h2>
+        <p className="text-slate-400 text-center max-w-xl mx-auto mb-14">
+          Menos trabajo para el consorcio, más orden para todos.
+        </p>
+        
+        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <Card className="bg-slate-900/50 border-slate-800 hover:border-emerald-500/30 transition-colors rounded-2xl overflow-hidden">
+            <CardContent className="p-8">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-5">
+                <Calendar className="w-7 h-7 text-emerald-400" />
               </div>
               <h3 className="text-xl font-semibold mb-2 text-white">Reservas 24/7</h3>
-              <p className="text-blue-300/50">
-                Tus clientes reservan online a cualquier hora. Ahorra hasta 2 horas diarias en llamadas.
+              <p className="text-slate-400 leading-relaxed">
+                Los vecinos eligen día y horario desde el celular. Sin llamados ni planillas en papel.
               </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-[#12121f] border-blue-900/30 hover:border-[#ccff00]/20 transition-all">
-            <CardContent className="p-6">
-              <div className="w-12 h-12 rounded-xl bg-[#0a4d8c]/30 flex items-center justify-center mb-4">
-                <TrendingUp className="w-6 h-6 text-[#ccff00]" />
+          <Card className="bg-slate-900/50 border-slate-800 hover:border-emerald-500/30 transition-colors rounded-2xl overflow-hidden">
+            <CardContent className="p-8">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-5">
+                <Building2 className="w-7 h-7 text-emerald-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-2 text-white">Más ocupación</h3>
-              <p className="text-blue-300/50">
-                Visualiza todas las canchas de un vistazo. No pierdas reservas por no poder atender.
+              <h3 className="text-xl font-semibold mb-2 text-white">Espacios a tu medida</h3>
+              <p className="text-slate-400 leading-relaxed">
+                Configurás SUM, gimnasio, parrillas y lo que tenga tu edificio. Duración y horarios por espacio.
               </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-[#12121f] border-blue-900/30 hover:border-[#ccff00]/20 transition-all">
-            <CardContent className="p-6">
-              <div className="w-12 h-12 rounded-xl bg-[#0a4d8c]/30 flex items-center justify-center mb-4">
-                <Zap className="w-6 h-6 text-[#ccff00]" />
+          <Card className="bg-slate-900/50 border-slate-800 hover:border-emerald-500/30 transition-colors rounded-2xl overflow-hidden">
+            <CardContent className="p-8">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-5">
+                <Users className="w-7 h-7 text-emerald-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-2 text-white">Súper rápido</h3>
-              <p className="text-blue-300/50">
-                Reserva en segundos. Timeline visual para elegir cancha, hora y duración de un vistazo.
+              <h3 className="text-xl font-semibold mb-2 text-white">Todo en un solo lugar</h3>
+              <p className="text-slate-400 leading-relaxed">
+                Panel para el admin, link para los vecinos. Calendario claro y sin conflictos de doble reserva.
               </p>
             </CardContent>
           </Card>
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features list */}
       <section className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12 text-white">
-            Todo lo que necesitas en un solo lugar
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-2xl font-bold text-center mb-10 text-white">
+            Lo que incluye ReservAr
           </h2>
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-4">
             {[
-              "Configuración en menos de 10 minutos",
-              "Personalización completa (logo, colores)",
-              "Gestión de múltiples canchas",
-              "Horarios flexibles y configurables",
-              "Turnos de 60, 90 o 120 minutos",
-              "Dashboard con reportes y estadísticas",
-              "Base de clientes automática",
-              "Integración con calendarios (.ics)",
+              "Múltiples espacios (SUM, gimnasio, parrilla, etc.)",
+              "Horarios configurables por espacio",
+              "Reserva online en segundos",
+              "Sin doble reserva: un horario, un vecino",
+              "Link único para tu edificio",
+              "Panel de administración simple",
+              "Opcional: precio por uso",
+              "Recordatorios por email",
             ].map((feature, index) => (
-              <div key={index} className="flex items-start gap-3 bg-[#12121f] p-4 rounded-xl border border-blue-900/20">
-                <div className="w-5 h-5 rounded-full bg-[#ccff00]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Check className="w-3 h-3 text-[#ccff00]" />
+              <div key={index} className="flex items-center gap-3 p-4 rounded-xl bg-slate-900/40 border border-slate-800/50">
+                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
-                <span className="text-blue-200/70">{feature}</span>
+                <span className="text-slate-300">{feature}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Social Proof */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="max-w-3xl mx-auto text-center bg-[#12121f] p-8 rounded-2xl border border-blue-900/30">
-          <div className="flex justify-center gap-1 mb-4">
-            {[...Array(5)].map((_, i) => (
-              <Star key={i} className="w-5 h-5 fill-[#ccff00] text-[#ccff00]" />
-            ))}
-          </div>
-          <p className="text-lg text-blue-200/70 mb-4">
-            "En menos de 10 minutos tenía mi sistema de reservas funcionando. Mis jugadores reservan online y yo ahorro horas cada día."
-          </p>
-          <p className="text-sm text-blue-300/40">- Club de Pádel Las Palmas</p>
-        </div>
-      </section>
-
-      {/* CTA Final */}
+      {/* CTA */}
       <section className="container mx-auto px-4 py-20">
-        <div className="max-w-3xl mx-auto text-center rounded-2xl p-12 relative overflow-hidden">
-          {/* Background gradient */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0a4d8c] to-[#1a6fc2]" />
-          
-          {/* Court lines decoration */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 bottom-0 left-1/2 w-px bg-white" />
-            <div className="absolute left-0 right-0 top-1/2 h-px bg-white" />
-            <div className="absolute inset-4 border-2 border-white rounded-lg" />
-          </div>
-          
-          {/* Paleta y pelota en el CTA */}
-          <div className="absolute top-4 right-6 md:right-12 hidden sm:block">
-            <div className="relative w-12 h-18 animate-[swing_2s_ease-in-out_infinite] origin-bottom">
-              <svg viewBox="0 0 80 140" className="w-full h-full drop-shadow-lg">
-                <rect x="32" y="90" width="16" height="50" rx="4" fill="#0a0a12" opacity="0.5" />
-                <ellipse cx="40" cy="45" rx="38" ry="44" fill="white" opacity="0.2" />
-                <ellipse cx="40" cy="45" rx="34" ry="40" fill="white" opacity="0.1" />
-                {[0,1,2,3,4].map((row) => (
-                  [0,1,2,3].map((col) => (
-                    <circle 
-                      key={`cta-${row}-${col}`}
-                      cx={18 + col * 15} 
-                      cy={20 + row * 14} 
-                      r="4" 
-                      fill="#0a4d8c"
-                      opacity="0.4"
-                    />
-                  ))
-                ))}
-              </svg>
+        <div className="max-w-3xl mx-auto rounded-3xl p-10 md:p-14 relative overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" />
+          <div className="relative z-10 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center mx-auto mb-6">
+              <Clock className="w-7 h-7 text-emerald-400" />
             </div>
-            <div className="absolute -left-3 top-3 w-6 h-6 rounded-full bg-[#ccff00] shadow-lg shadow-[#ccff00]/50 animate-[ballBounce_2s_ease-in-out_infinite]" />
-          </div>
-          
-          <div className="relative z-10">
-            <h2 className="text-3xl font-bold mb-4 text-white">
-              ¿Listo para profesionalizar tu club? 🎾
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white">
+              ¿Listo para ordenar las reservas de tu edificio?
             </h2>
-            <p className="text-xl mb-8 text-blue-100/80">
-              Comienza gratis. Sin tarjeta de crédito. Configuración en minutos.
+            <p className="text-slate-400 mb-8 max-w-md mx-auto">
+              Creá tu edificio en minutos. Sin tarjeta de crédito. Los vecinos empiezan a reservar cuando vos lo habilitás.
             </p>
-            <Link href="/onboarding">
-              <Button size="lg" className="text-lg px-8 py-6 bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a0a12] font-bold shadow-lg shadow-[#ccff00]/30">
-                Comenzar ahora
-                <ArrowRight className="ml-2 w-5 h-5" />
+            <Link href="/suscripcion">
+              <Button size="lg" className="text-base px-8 py-6 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl shadow-lg shadow-emerald-500/20">
+                Suscribirme
+                <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </Link>
           </div>
@@ -253,10 +195,11 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-4 py-8 border-t border-blue-900/20">
-        <div className="flex items-center justify-center gap-3 text-blue-300/40 text-sm">
-          <span className="text-xl">🎾</span>
-          <span>PadelTurn - Sistema de reservas para canchas de pádel</span>
+      <footer className="border-t border-slate-800/50 py-8">
+        <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-slate-500 text-sm">
+          <span className="font-semibold text-slate-400">ReservAr</span>
+          <span className="hidden sm:inline">·</span>
+          <span>Reservas de espacios comunes para edificios y condominios</span>
         </div>
       </footer>
     </div>

@@ -26,11 +26,11 @@ function BookPageContent() {
 
   if (isLoading || (!isReady && tenant)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-green-50 to-white">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white">
         <div className="text-center">
-          <div className="text-5xl mb-4">🎾</div>
-          <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
-          <p className="text-gray-600">Cargando canchas...</p>
+          <div className="text-5xl mb-4">🏢</div>
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Cargando espacios...</p>
         </div>
       </div>
     )
@@ -38,11 +38,11 @@ function BookPageContent() {
 
   if (!tenant) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-green-50 to-white">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white">
         <div className="text-center">
-          <div className="text-6xl mb-4">🎾</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Club no encontrado</h1>
-          <p className="text-gray-600">El club de pádel que estás buscando no existe</p>
+          <div className="text-6xl mb-4">🏢</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Edificio no encontrado</h1>
+          <p className="text-gray-600">El edificio o condominio que estás buscando no existe</p>
         </div>
       </div>
     )

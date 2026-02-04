@@ -34,6 +34,8 @@ export interface CreateTenantDto {
   fontFamily?: string;
   timezone?: string;
   locale?: string;
+  /** Contraseña del administrador (onboarding) */
+  password?: string;
 }
 
 export interface UpdateTenantDto {
@@ -139,6 +141,8 @@ export interface UpdateProfessionalDto {
 export interface Schedule {
   id: string;
   tenantId?: string;
+  serviceId?: string;
+  service?: { id: string; name: string };
   professionalId?: string;
   professional?: {
     id: string;
@@ -157,7 +161,8 @@ export interface Schedule {
 }
 
 export interface CreateScheduleDto {
-  professionalId?: string;
+  serviceId?: string;     // Espacio común (SUM, Gimnasio, etc.)
+  professionalId?: string; // Recurso opcional
   dayOfWeek: number;
   startTime: string;
   endTime: string;
@@ -228,15 +233,13 @@ export enum AppointmentStatus {
 }
 
 export interface CreateAppointmentDto {
-  // Datos del cliente (si no existe, se crea automáticamente)
   customerFirstName: string;
   customerLastName: string;
   customerEmail: string;
   customerPhone?: string;
-  // Datos del turno
-  serviceId: string;
-  professionalId: string;
-  startTime: string; // ISO string
+  serviceId: string;   // Espacio común (obligatorio)
+  professionalId?: string; // Opcional (edificios/condominios solo usan serviceId)
+  startTime: string;   // ISO string
   status?: AppointmentStatus;
   notes?: string;
 }
@@ -251,9 +254,9 @@ export interface UpdateAppointmentDto {
 }
 
 export interface AvailabilityQuery {
-  professionalId: string;
-  serviceId: string;
-  date: string; // ISO date string (yyyy-MM-dd)
+  serviceId: string;   // Espacio común (obligatorio)
+  professionalId?: string; // Opcional (recursos/profesionales)
+  date: string;        // ISO date string (yyyy-MM-dd)
 }
 
 export interface TimeSlot {
@@ -267,6 +270,7 @@ export interface AvailabilityResponse {
 
 export interface LoginDto {
   email: string;
+  password: string;
 }
 
 export interface VerifyTokenDto {

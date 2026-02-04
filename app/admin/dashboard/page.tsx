@@ -12,10 +12,10 @@ export default function AdminDashboardPage() {
   return (
     <ProtectedRoute>
       <Suspense fallback={
-        <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center justify-center min-h-screen bg-slate-950">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Cargando...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-emerald-500/30 border-t-emerald-500 mx-auto mb-4"></div>
+            <p className="text-slate-400">Cargando...</p>
           </div>
         </div>
       }>

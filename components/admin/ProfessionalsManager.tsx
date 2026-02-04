@@ -106,7 +106,7 @@ export function ProfessionalsManager() {
   if (loadingCourts || loadingServices) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-[#0a4d8c]/20 border-t-[#0a4d8c] rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
       </div>
     )
   }
@@ -116,11 +116,11 @@ export function ProfessionalsManager() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-white">🎾 Canchas</h2>
-          <p className="text-blue-200/60">Administra las canchas de tu club</p>
+          <p className="text-slate-400">Administra las canchas de tu club</p>
         </div>
         {!isCreating && (
           <Button 
-            className="gap-2 bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c] font-semibold" 
+            className="gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold" 
             onClick={() => setIsCreating(true)}
           >
             <Plus className="w-4 h-4" />
@@ -131,7 +131,7 @@ export function ProfessionalsManager() {
 
       {/* Formulario de creación */}
       {isCreating && (
-        <Card className="border-2 border-[#ccff00]/30 bg-[#12121f]">
+        <Card className="border-2 border-emerald-500/30 bg-slate-900/50">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="text-white">🎾 Nueva Cancha</CardTitle>
@@ -143,20 +143,20 @@ export function ProfessionalsManager() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-blue-200/70">Nombre *</Label>
+                <Label className="text-slate-300">Nombre *</Label>
                 <Input
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                   placeholder="Cancha 1"
-                  className="mt-2 bg-[#1a1a2e] border-blue-900/40 text-white"
+                  className="mt-2 bg-slate-800 border-slate-700 text-white"
                 />
               </div>
               <div>
-                <Label className="text-blue-200/70">Superficie</Label>
+                <Label className="text-slate-300">Superficie</Label>
                 <select
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-blue-900/40 rounded-md text-white"
+                  className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
                 >
                   <option value="Cristal">Cristal</option>
                   <option value="Muro">Muro</option>
@@ -165,17 +165,17 @@ export function ProfessionalsManager() {
               </div>
             </div>
             <div>
-              <Label className="text-blue-200/70">Características</Label>
+              <Label className="text-slate-300">Características</Label>
               <Input
                 value={formData.bio || ''}
                 onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                 placeholder="Techada, iluminación LED, climatizada"
-                className="mt-2 bg-[#1a1a2e] border-blue-900/40 text-white"
+                className="mt-2 bg-slate-800 border-slate-700 text-white"
               />
             </div>
             {services && services.length > 0 && (
               <div>
-                <Label className="text-blue-200/70">Duraciones disponibles</Label>
+                <Label className="text-slate-300">Duraciones disponibles</Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {services.map((service) => (
                     <Badge
@@ -183,8 +183,8 @@ export function ProfessionalsManager() {
                       variant={(formData.serviceIds || []).includes(service.id) ? "default" : "outline"}
                       className={`cursor-pointer ${
                         (formData.serviceIds || []).includes(service.id) 
-                          ? 'bg-[#0a4d8c] text-white' 
-                          : 'border-blue-900/40 text-blue-200/70 hover:bg-blue-900/20'
+                          ? 'bg-emerald-500 text-white' 
+                          : 'border-slate-700 text-slate-300 hover:bg-slate-700'
                       }`}
                       onClick={() => toggleService(service.id)}
                     >
@@ -198,7 +198,7 @@ export function ProfessionalsManager() {
               <Button 
                 onClick={handleCreate} 
                 disabled={createCourt.isPending}
-                className="bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c] font-semibold"
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
               >
                 {createCourt.isPending ? (
                   <>
@@ -209,7 +209,7 @@ export function ProfessionalsManager() {
                   'Crear Cancha'
                 )}
               </Button>
-              <Button variant="outline" onClick={() => setIsCreating(false)} className="border-blue-900/40 text-blue-200/70">
+              <Button variant="outline" onClick={() => setIsCreating(false)} className="border-slate-700 text-slate-300">
                 Cancelar
               </Button>
             </div>
@@ -219,13 +219,13 @@ export function ProfessionalsManager() {
 
       {/* Lista de canchas */}
       {!courts || courts.length === 0 ? (
-        <Card className="bg-[#12121f] border-blue-900/30">
+        <Card className="bg-slate-900/50 border-slate-800">
           <CardContent className="py-12 text-center">
             <div className="text-6xl mb-4">🎾</div>
-            <p className="text-blue-200/60 mb-4">No hay canchas creadas</p>
+            <p className="text-slate-400 mb-4">No hay canchas creadas</p>
             <Button 
               onClick={() => setIsCreating(true)}
-              className="bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c]"
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950"
             >
               <Plus className="w-4 h-4 mr-2" />
               Crear Primera Cancha
@@ -239,13 +239,13 @@ export function ProfessionalsManager() {
                             court.bio?.toLowerCase().includes('cubierta')
             
             return (
-              <Card key={court.id} className="overflow-hidden bg-[#12121f] border-blue-900/30">
+              <Card key={court.id} className="overflow-hidden bg-slate-900/50 border-slate-800">
                 {/* Header visual */}
                 <div 
                   className="h-32 flex items-center justify-center relative"
                   style={{
                     background: court.isActive 
-                      ? 'linear-gradient(135deg, #0a4d8c 0%, #1a6fc2 100%)'
+                      ? 'linear-gradient(135deg, rgb(16 185 129 / 0.3) 0%, rgb(16 185 129 / 0.1) 100%)'
                       : 'linear-gradient(135deg, #374151 0%, #1f2937 100%)',
                     backgroundImage: court.photoUrl ? `url(${court.photoUrl})` : undefined,
                     backgroundSize: 'cover',
@@ -256,7 +256,7 @@ export function ProfessionalsManager() {
                     <div className="text-white text-5xl opacity-30">🎾</div>
                   )}
                   {isIndoor && (
-                    <Badge className="absolute top-2 right-2 bg-[#ccff00] text-[#0a4d8c]">
+                    <Badge className="absolute top-2 right-2 bg-emerald-500/20 text-emerald-400">
                       🏠 Techada
                     </Badge>
                   )}
@@ -274,14 +274,14 @@ export function ProfessionalsManager() {
                     <div>
                       <h3 className="font-bold text-lg text-white">{court.fullName}</h3>
                       {court.bio && (
-                        <p className="text-sm text-blue-200/50">{court.bio}</p>
+                        <p className="text-sm text-slate-500">{court.bio}</p>
                       )}
                     </div>
                     <div className="flex gap-1">
                       <Button 
                         variant="ghost" 
                         size="icon"
-                        className="text-blue-200/60 hover:text-white hover:bg-blue-900/30"
+                        className="text-slate-400 hover:text-white hover:bg-blue-900/30"
                         onClick={() => {
                           setEditingId(court.id)
                           setFormData({
@@ -311,7 +311,7 @@ export function ProfessionalsManager() {
 
                   <div className="flex flex-wrap gap-1 mt-3">
                     {court.isActive ? (
-                      <Badge className="text-xs bg-[#ccff00]/20 text-[#ccff00] border-0">
+                      <Badge className="text-xs bg-emerald-500/20 text-emerald-400 border-0">
                         ✓ Activa
                       </Badge>
                     ) : (
@@ -330,7 +330,7 @@ export function ProfessionalsManager() {
       {/* Modal de edición */}
       {editingId && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md bg-[#12121f] border-blue-900/30">
+          <Card className="w-full max-w-md bg-slate-900/50 border-slate-800">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-white">🎾 Editar Cancha</CardTitle>
@@ -342,19 +342,19 @@ export function ProfessionalsManager() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-blue-200/70">Nombre *</Label>
+                  <Label className="text-slate-300">Nombre *</Label>
                   <Input
                     value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    className="mt-2 bg-[#1a1a2e] border-blue-900/40 text-white"
+                    className="mt-2 bg-slate-800 border-slate-700 text-white"
                   />
                 </div>
                 <div>
-                  <Label className="text-blue-200/70">Superficie</Label>
+                  <Label className="text-slate-300">Superficie</Label>
                   <select
                     value={formData.lastName}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-blue-900/40 rounded-md text-white"
+                    className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
                   >
                     <option value="Cristal">Cristal</option>
                     <option value="Muro">Muro</option>
@@ -363,16 +363,16 @@ export function ProfessionalsManager() {
                 </div>
               </div>
               <div>
-                <Label className="text-blue-200/70">Características</Label>
+                <Label className="text-slate-300">Características</Label>
                 <Input
                   value={formData.bio || ''}
                   onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  className="mt-2 bg-[#1a1a2e] border-blue-900/40 text-white"
+                  className="mt-2 bg-slate-800 border-slate-700 text-white"
                 />
               </div>
               {services && services.length > 0 && (
                 <div>
-                  <Label className="text-blue-200/70">Duraciones</Label>
+                  <Label className="text-slate-300">Duraciones</Label>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {services.map((service) => (
                       <Badge
@@ -380,8 +380,8 @@ export function ProfessionalsManager() {
                         variant={(formData.serviceIds || []).includes(service.id) ? "default" : "outline"}
                         className={`cursor-pointer ${
                           (formData.serviceIds || []).includes(service.id) 
-                            ? 'bg-[#0a4d8c] text-white' 
-                            : 'border-blue-900/40 text-blue-200/70'
+                            ? 'bg-emerald-500 text-white' 
+                            : 'border-slate-700 text-slate-300'
                         }`}
                         onClick={() => toggleService(service.id)}
                       >
@@ -395,7 +395,7 @@ export function ProfessionalsManager() {
                 <Button 
                   onClick={() => handleUpdate(editingId, formData)}
                   disabled={updateCourt.isPending}
-                  className="bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c] font-semibold"
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
                 >
                   {updateCourt.isPending ? (
                     <>
@@ -406,7 +406,7 @@ export function ProfessionalsManager() {
                     'Guardar'
                   )}
                 </Button>
-                <Button variant="outline" onClick={() => setEditingId(null)} className="border-blue-900/40 text-blue-200/70">
+                <Button variant="outline" onClick={() => setEditingId(null)} className="border-slate-700 text-slate-300">
                   Cancelar
                 </Button>
               </div>

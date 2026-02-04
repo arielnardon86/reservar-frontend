@@ -11,7 +11,7 @@ import {
   useUpdateSchedule, 
   useDeleteSchedule 
 } from "@/lib/api/hooks"
-import { useProfessionals } from "@/lib/api/hooks"
+import { useProfessionals, useServices } from "@/lib/api/hooks"
 import { Plus, Edit, Trash2, X, Loader2, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
@@ -30,6 +30,7 @@ const DAYS_OF_WEEK = [
 export function SchedulesManager() {
   const { data: schedules, isLoading } = useSchedules()
   const { data: courts } = useProfessionals()
+  const { data: spaces } = useServices()
   const createSchedule = useCreateSchedule()
   const updateSchedule = useUpdateSchedule()
   const deleteSchedule = useDeleteSchedule()
@@ -37,6 +38,7 @@ export function SchedulesManager() {
   const [isCreating, setIsCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState<CreateScheduleDto>({
+    serviceId: undefined,
     professionalId: undefined,
     dayOfWeek: 1,
     startTime: "08:00",
@@ -54,6 +56,7 @@ export function SchedulesManager() {
       await createSchedule.mutateAsync(formData)
       toast.success('Horario creado')
       setFormData({
+        serviceId: undefined,
         professionalId: undefined,
         dayOfWeek: 1,
         startTime: "08:00",
@@ -95,7 +98,7 @@ export function SchedulesManager() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-[#0a4d8c]/20 border-t-[#0a4d8c] rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
       </div>
     )
   }
@@ -104,12 +107,12 @@ export function SchedulesManager() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">🕐 Horarios del Club</h2>
-          <p className="text-blue-200/60">Configura los horarios de apertura para reservas</p>
+          <h2 className="text-2xl font-bold text-white">🕐 Horarios</h2>
+          <p className="text-slate-400">Configura los horarios de apertura para reservas</p>
         </div>
         {!isCreating && (
           <Button 
-            className="gap-2 bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c] font-semibold" 
+            className="gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold" 
             onClick={() => setIsCreating(true)}
           >
             <Plus className="w-4 h-4" />
@@ -120,7 +123,7 @@ export function SchedulesManager() {
 
       {/* Formulario de creación */}
       {isCreating && (
-        <Card className="border-2 border-[#ccff00]/30 bg-[#12121f]">
+        <Card className="border-2 border-emerald-500/30 bg-slate-900/50">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="text-white">🕐 Nuevo Horario</CardTitle>
@@ -132,29 +135,39 @@ export function SchedulesManager() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-blue-200/70">Cancha (opcional)</Label>
+                <Label className="text-slate-300">Espacio común (opcional)</Label>
                 <select
-                  value={formData.professionalId || ''}
-                  onChange={(e) => setFormData({ ...formData, professionalId: e.target.value || undefined })}
-                  className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-blue-900/40 rounded-md text-white"
+                  value={formData.serviceId || ''}
+                  onChange={(e) => setFormData({ ...formData, serviceId: e.target.value || undefined, professionalId: undefined })}
+                  className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
                 >
-                  <option value="">Todas las canchas (global)</option>
-                  {courts?.filter(c => c.isActive).map((court) => (
-                    <option key={court.id} value={court.id}>
-                      {court.fullName}
-                    </option>
+                  <option value="">Global</option>
+                  {spaces?.filter(s => s.isActive).map((space) => (
+                    <option key={space.id} value={space.id}>{space.name}</option>
                   ))}
                 </select>
-                <p className="text-xs text-blue-200/40 mt-1">
-                  Dejá vacío para aplicar a todas
-                </p>
               </div>
               <div>
-                <Label className="text-blue-200/70">Día *</Label>
+                <Label className="text-slate-300">Recurso (opcional)</Label>
+                <select
+                  value={formData.professionalId || ''}
+                  onChange={(e) => setFormData({ ...formData, professionalId: e.target.value || undefined, serviceId: undefined })}
+                  className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
+                >
+                  <option value="">Ninguno</option>
+                  {courts?.filter(c => c.isActive).map((court) => (
+                    <option key={court.id} value={court.id}>{court.fullName}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-slate-300">Día *</Label>
                 <select
                   value={formData.dayOfWeek}
                   onChange={(e) => setFormData({ ...formData, dayOfWeek: parseInt(e.target.value) })}
-                  className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-blue-900/40 rounded-md text-white"
+                  className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
                 >
                   {DAYS_OF_WEEK.map((day) => (
                     <option key={day.value} value={day.value}>
@@ -166,21 +179,21 @@ export function SchedulesManager() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-blue-200/70">Apertura *</Label>
+                <Label className="text-slate-300">Apertura *</Label>
                 <Input
                   type="time"
                   value={formData.startTime}
                   onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="mt-2 bg-[#1a1a2e] border-blue-900/40 text-white"
+                  className="mt-2 bg-slate-800 border-slate-700 text-white"
                 />
               </div>
               <div>
-                <Label className="text-blue-200/70">Cierre *</Label>
+                <Label className="text-slate-300">Cierre *</Label>
                 <Input
                   type="time"
                   value={formData.endTime}
                   onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="mt-2 bg-[#1a1a2e] border-blue-900/40 text-white"
+                  className="mt-2 bg-slate-800 border-slate-700 text-white"
                 />
               </div>
             </div>
@@ -188,7 +201,7 @@ export function SchedulesManager() {
               <Button 
                 onClick={handleCreate} 
                 disabled={createSchedule.isPending}
-                className="bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c] font-semibold"
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
               >
                 {createSchedule.isPending ? (
                   <>
@@ -199,7 +212,7 @@ export function SchedulesManager() {
                   'Crear Horario'
                 )}
               </Button>
-              <Button variant="outline" onClick={() => setIsCreating(false)} className="border-blue-900/40 text-blue-200/70">
+              <Button variant="outline" onClick={() => setIsCreating(false)} className="border-slate-700 text-slate-300">
                 Cancelar
               </Button>
             </div>
@@ -209,16 +222,16 @@ export function SchedulesManager() {
 
       {/* Lista de horarios por día */}
       {!schedules || schedules.length === 0 ? (
-        <Card className="bg-[#12121f] border-blue-900/30">
+        <Card className="bg-slate-900/50 border-slate-800">
           <CardContent className="py-12 text-center">
-            <Clock className="w-12 h-12 text-blue-200/30 mx-auto mb-4" />
-            <p className="text-blue-200/60 mb-4">No hay horarios configurados</p>
-            <p className="text-sm text-blue-200/40 mb-4">
+            <Clock className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+            <p className="text-slate-400 mb-4">No hay horarios configurados</p>
+            <p className="text-sm text-slate-400 mb-4">
               Tus clientes necesitan horarios para poder reservar
             </p>
             <Button 
               onClick={() => setIsCreating(true)}
-              className="bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c]"
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950"
             >
               <Plus className="w-4 h-4 mr-2" />
               Crear Primer Horario
@@ -228,47 +241,45 @@ export function SchedulesManager() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {schedulesByDay.map(({ day, schedules: daySchedules }) => (
-            <Card key={day.value} className={`bg-[#12121f] border-blue-900/30 ${daySchedules.length === 0 ? 'opacity-50' : ''}`}>
+            <Card key={day.value} className={`bg-slate-900/50 border-slate-800 ${daySchedules.length === 0 ? 'opacity-50' : ''}`}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-white flex items-center justify-between">
                   <span>{day.label}</span>
                   {daySchedules.length > 0 && (
-                    <Badge className="bg-[#0a4d8c] text-white">{daySchedules.length}</Badge>
+                    <Badge className="bg-emerald-500 text-white">{daySchedules.length}</Badge>
                   )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {daySchedules.length === 0 ? (
-                  <p className="text-blue-200/40 text-sm">Sin horarios</p>
+                  <p className="text-slate-400 text-sm">Sin horarios</p>
                 ) : (
                   <div className="space-y-2">
                     {daySchedules.map((schedule) => {
+                      const space = schedule.service || spaces?.find(s => s.id === schedule.serviceId)
                       const court = schedule.professional || courts?.find(c => c.id === schedule.professionalId)
-                      
+                      const assignLabel = space?.name || court?.fullName || 'Global'
                       return (
                         <div
                           key={schedule.id}
-                          className="flex items-center justify-between p-2 bg-[#0a4d8c]/20 rounded-lg"
+                          className="flex items-center justify-between p-2 bg-emerald-500/20 rounded-lg"
                         >
                           <div>
                             <div className="flex items-center gap-2 text-white font-medium">
-                              <Clock className="w-3 h-3 text-[#ccff00]" />
+                              <Clock className="w-3 h-3 text-emerald-400" />
                               {schedule.startTime} - {schedule.endTime}
                             </div>
-                            {court ? (
-                              <span className="text-xs text-blue-200/50">{court.fullName}</span>
-                            ) : (
-                              <span className="text-xs text-[#ccff00]">Todas</span>
-                            )}
+                            <span className="text-xs text-slate-500">{assignLabel}</span>
                           </div>
                           <div className="flex gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-blue-200/60 hover:text-white hover:bg-blue-900/30"
+                              className="h-7 w-7 text-slate-400 hover:text-white hover:bg-blue-900/30"
                               onClick={() => {
                                 setEditingId(schedule.id)
                                 setFormData({
+                                  serviceId: schedule.serviceId || undefined,
                                   professionalId: schedule.professionalId || undefined,
                                   dayOfWeek: schedule.dayOfWeek,
                                   startTime: schedule.startTime,
@@ -302,7 +313,7 @@ export function SchedulesManager() {
       {/* Modal de edición */}
       {editingId && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md bg-[#12121f] border-blue-900/30">
+          <Card className="w-full max-w-md bg-slate-900/50 border-slate-800">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-white">🕐 Editar Horario</CardTitle>
@@ -314,26 +325,39 @@ export function SchedulesManager() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-blue-200/70">Cancha</Label>
+                  <Label className="text-slate-300">Espacio común</Label>
                   <select
-                    value={formData.professionalId || ''}
-                    onChange={(e) => setFormData({ ...formData, professionalId: e.target.value || undefined })}
-                    className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-blue-900/40 rounded-md text-white"
+                    value={formData.serviceId || ''}
+                    onChange={(e) => setFormData({ ...formData, serviceId: e.target.value || undefined, professionalId: undefined })}
+                    className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
                   >
-                    <option value="">Todas</option>
-                    {courts?.filter(c => c.isActive).map((court) => (
-                      <option key={court.id} value={court.id}>
-                        {court.fullName}
-                      </option>
+                    <option value="">Global</option>
+                    {spaces?.filter(s => s.isActive).map((space) => (
+                      <option key={space.id} value={space.id}>{space.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <Label className="text-blue-200/70">Día</Label>
+                  <Label className="text-slate-300">Recurso</Label>
+                  <select
+                    value={formData.professionalId || ''}
+                    onChange={(e) => setFormData({ ...formData, professionalId: e.target.value || undefined, serviceId: undefined })}
+                    className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
+                  >
+                    <option value="">Ninguno</option>
+                    {courts?.filter(c => c.isActive).map((court) => (
+                      <option key={court.id} value={court.id}>{court.fullName}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-slate-300">Día</Label>
                   <select
                     value={formData.dayOfWeek}
                     onChange={(e) => setFormData({ ...formData, dayOfWeek: parseInt(e.target.value) })}
-                    className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-blue-900/40 rounded-md text-white"
+                    className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
                   >
                     {DAYS_OF_WEEK.map((day) => (
                       <option key={day.value} value={day.value}>
@@ -345,21 +369,21 @@ export function SchedulesManager() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-blue-200/70">Apertura</Label>
+                  <Label className="text-slate-300">Apertura</Label>
                   <Input
                     type="time"
                     value={formData.startTime}
                     onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="mt-2 bg-[#1a1a2e] border-blue-900/40 text-white"
+                    className="mt-2 bg-slate-800 border-slate-700 text-white"
                   />
                 </div>
                 <div>
-                  <Label className="text-blue-200/70">Cierre</Label>
+                  <Label className="text-slate-300">Cierre</Label>
                   <Input
                     type="time"
                     value={formData.endTime}
                     onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    className="mt-2 bg-[#1a1a2e] border-blue-900/40 text-white"
+                    className="mt-2 bg-slate-800 border-slate-700 text-white"
                   />
                 </div>
               </div>
@@ -367,7 +391,7 @@ export function SchedulesManager() {
                 <Button
                   onClick={() => handleUpdate(editingId, formData)}
                   disabled={updateSchedule.isPending}
-                  className="bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c] font-semibold"
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
                 >
                   {updateSchedule.isPending ? (
                     <>
@@ -378,7 +402,7 @@ export function SchedulesManager() {
                     'Guardar'
                   )}
                 </Button>
-                <Button variant="outline" onClick={() => setEditingId(null)} className="border-blue-900/40 text-blue-200/70">
+                <Button variant="outline" onClick={() => setEditingId(null)} className="border-slate-700 text-slate-300">
                   Cancelar
                 </Button>
               </div>

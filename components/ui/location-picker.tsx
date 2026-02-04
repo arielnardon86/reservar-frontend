@@ -1,11 +1,14 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { MapPin, Loader2 } from "lucide-react"
 import dynamic from "next/dynamic"
+
+const NOMINATIM_DELAY_MS = 350
+const NOMINATIM_MIN_CHARS = 3
 
 // Importar Leaflet dinámicamente para evitar problemas de SSR
 const MapContainer = dynamic(
@@ -48,6 +51,12 @@ interface LocationPickerProps {
 }
 
 
+interface Suggestion {
+  display_name: string
+  lat: string
+  lon: string
+}
+
 export function LocationPicker({
   value = '',
   onChange,
@@ -57,31 +66,116 @@ export function LocationPicker({
 }: LocationPickerProps) {
   const [address, setAddress] = useState(value)
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null)
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showMap, setShowMap] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const mapRef = useRef<any>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const skipBlurGeocodeRef = useRef(false)
 
   useEffect(() => {
     setAddress(value)
   }, [value])
 
-  // Geocodificación: convertir dirección a coordenadas
-  const geocodeAddress = async (address: string) => {
-    if (!address.trim()) return
-
+  // Buscar sugerencias mientras se escribe (Nominatim)
+  const fetchSuggestions = useCallback(async (query: string) => {
+    if (query.trim().length < NOMINATIM_MIN_CHARS) {
+      setSuggestions([])
+      return
+    }
     setIsSearching(true)
     try {
-      // Usar Nominatim (OpenStreetMap) - gratuito, no requiere API key
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=0`,
         {
-          headers: {
-            'User-Agent': 'TurneroApp/1.0',
-          },
+          headers: { 'User-Agent': 'ReservAr/1.0' },
         }
       )
       const data = await response.json()
+      setSuggestions(Array.isArray(data) ? data : [])
+      setHighlightedIndex(-1)
+      setShowDropdown(true)
+    } catch (error) {
+      console.error('Error fetching suggestions:', error)
+      setSuggestions([])
+    } finally {
+      setIsSearching(false)
+    }
+  }, [])
 
+  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value
+    setAddress(v)
+    onChange?.(v)
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (v.trim().length < NOMINATIM_MIN_CHARS) {
+      setSuggestions([])
+      setShowDropdown(false)
+      return
+    }
+    debounceRef.current = setTimeout(() => {
+      fetchSuggestions(v.trim())
+    }, NOMINATIM_DELAY_MS)
+  }
+
+  const selectSuggestion = (s: Suggestion) => {
+    skipBlurGeocodeRef.current = true
+    const coords = { lat: parseFloat(s.lat), lng: parseFloat(s.lon) }
+    setAddress(s.display_name)
+    setCoordinates(coords)
+    setSuggestions([])
+    setShowDropdown(false)
+    setHighlightedIndex(-1)
+    onChange?.(s.display_name, coords.lat, coords.lng)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown || suggestions.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlightedIndex((i) => (i < suggestions.length - 1 ? i + 1 : 0))
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightedIndex((i) => (i > 0 ? i - 1 : suggestions.length - 1))
+      return
+    }
+    if (e.key === 'Enter' && highlightedIndex >= 0 && suggestions[highlightedIndex]) {
+      e.preventDefault()
+      selectSuggestion(suggestions[highlightedIndex])
+      return
+    }
+    if (e.key === 'Escape') {
+      setShowDropdown(false)
+      setHighlightedIndex(-1)
+    }
+  }
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Geocodificación al hacer blur si no eligió sugerencia (comportamiento anterior)
+  const geocodeAddress = async (addressText: string) => {
+    if (!addressText.trim()) return
+    setIsSearching(true)
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressText)}&limit=1`,
+        { headers: { 'User-Agent': 'ReservAr/1.0' } }
+      )
+      const data = await response.json()
       if (data && data.length > 0) {
         const { lat, lon, display_name } = data[0]
         const coords = { lat: parseFloat(lat), lng: parseFloat(lon) }
@@ -90,12 +184,11 @@ export function LocationPicker({
         onChange?.(display_name, coords.lat, coords.lng)
         setShowMap(true)
       } else {
-        // Si no se encuentra, permitir ingresar manualmente
-        onChange?.(address)
+        onChange?.(addressText)
       }
     } catch (error) {
       console.error('Error geocoding:', error)
-      onChange?.(address)
+      onChange?.(addressText)
     } finally {
       setIsSearching(false)
     }
@@ -138,33 +231,58 @@ export function LocationPicker({
   return (
     <div className="space-y-2">
       {label && <Label>{label} {required && '*'}</Label>}
-      <div className="space-y-2">
-        <div className="flex gap-2">
-          <Input
-            value={address}
-            onChange={(e) => {
-              setAddress(e.target.value)
-              onChange?.(e.target.value)
-            }}
-            onBlur={() => {
-              if (address.trim()) {
-                geocodeAddress(address)
-              }
-            }}
-            placeholder={placeholder}
-            className="flex-1"
-          />
+      <div className="space-y-2" ref={dropdownRef}>
+        <div className="flex gap-2 relative">
+          <div className="flex-1 relative">
+            <Input
+              value={address}
+              onChange={onInputChange}
+              onBlur={() => {
+                setTimeout(() => {
+                  if (skipBlurGeocodeRef.current) {
+                    skipBlurGeocodeRef.current = false
+                    return
+                  }
+                  if (address.trim()) geocodeAddress(address)
+                }, 200)
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              className="pr-9"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+              {isSearching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <MapPin className="w-4 h-4" />
+              )}
+            </span>
+            {showDropdown && suggestions.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 py-1 bg-popover border border-border rounded-md shadow-lg max-h-56 overflow-auto">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={`${s.lat}-${s.lon}-${i}`}
+                    type="button"
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-accent focus:bg-accent focus:outline-none ${i === highlightedIndex ? 'bg-accent' : ''}`}
+                    onMouseEnter={() => setHighlightedIndex(i)}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      selectSuggestion(s)
+                    }}
+                  >
+                    {s.display_name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <Button
             type="button"
             variant="outline"
             onClick={() => setShowMap(!showMap)}
             disabled={isSearching}
           >
-            {isSearching ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <MapPin className="w-4 h-4" />
-            )}
+            <MapPin className="w-4 h-4" />
           </Button>
         </div>
         
@@ -212,7 +330,7 @@ export function LocationPicker({
         )}
       </div>
       <p className="text-xs text-gray-500">
-        Escribe la dirección y presiona Enter, o haz clic en el mapa para seleccionar la ubicación exacta
+        Escribí y elegí una sugerencia, o abrí el mapa para marcar la ubicación exacta
       </p>
     </div>
   )

@@ -23,13 +23,13 @@ import {
   Mail,
   Info
 } from "lucide-react"
-import { useProfessionals, useServices, useDayAppointments } from "@/lib/api/hooks"
+import { useServices, useDayAppointments } from "@/lib/api/hooks"
 import { useTenantContext } from "@/lib/context/TenantContext"
 import { useParams } from "next/navigation"
 import { appointmentsApi } from "@/lib/api/endpoints"
 import { toast } from "sonner"
 import { useQueryClient } from "@tanstack/react-query"
-import type { Service, Professional, TimeSlot, AppointmentStatus } from "@/lib/api/types"
+import type { Service, TimeSlot, AppointmentStatus } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
 
 // Constantes
@@ -39,14 +39,13 @@ const TOTAL_HOURS = HOUR_END - HOUR_START
 const SLOT_DURATION = 30
 const TOTAL_SLOTS = (TOTAL_HOURS * 60) / SLOT_DURATION
 
-// Tipos
+// Tipos: reserva por espacio común (sin profesional/recurso)
 interface BookingSelection {
-  court: Professional
+  space: Service
   date: Date
   startTime: string
   endTime: string
   duration: number
-  service: Service
 }
 
 interface OccupiedBlock {
@@ -102,7 +101,6 @@ export function QuickBooking() {
   const { tenant } = useTenantContext()
   const queryClient = useQueryClient()
   
-  const { data: courts, isLoading: loadingCourts } = useProfessionals()
   const { data: services, isLoading: loadingServices } = useServices()
   
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()))
@@ -110,13 +108,13 @@ export function QuickBooking() {
   const [loadingAvailability, setLoadingAvailability] = useState(false)
   
   const [activeSelection, setActiveSelection] = useState<{
-    courtId: string
+    spaceId: string
     startSlot: number
-    court: Professional
+    space: Service
   } | null>(null)
   const [hoveredDuration, setHoveredDuration] = useState<number | null>(null)
   const [hoveredSlot, setHoveredSlot] = useState<{
-    courtId: string
+    spaceId: string
     slot: number
   } | null>(null)
   
@@ -127,26 +125,25 @@ export function QuickBooking() {
   const [bookingSuccess, setBookingSuccess] = useState(false)
   
   const days = useMemo(() => generateDays(), [])
-  const activeCourts = useMemo(() => courts?.filter(c => c.isActive) || [], [courts])
+  const activeSpaces = useMemo(() => services?.filter(s => s.isActive) || [], [services])
   
   const dateStr = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate])
   const { data: dayAppointmentsData } = useDayAppointments(tenantSlug, dateStr)
   
   const dayAppointments = useMemo(() => {
-    if (!dayAppointmentsData || !activeCourts.length) return {}
-    const appointmentsByCourt: Record<string, any[]> = {}
-    activeCourts.forEach(court => {
-      appointmentsByCourt[court.id] = dayAppointmentsData.filter(
-        apt => apt.professionalId === court.id
+    if (!dayAppointmentsData || !activeSpaces.length) return {}
+    const bySpace: Record<string, any[]> = {}
+    activeSpaces.forEach(space => {
+      bySpace[space.id] = dayAppointmentsData.filter(
+        apt => apt.serviceId === space.id && !apt.professionalId
       )
     })
-    return appointmentsByCourt
-  }, [dayAppointmentsData, activeCourts])
+    return bySpace
+  }, [dayAppointmentsData, activeSpaces])
   const sortedServices = useMemo(() => {
     if (!services) return []
     return [...services].filter(s => s.isActive).sort((a, b) => a.duration - b.duration)
   }, [services])
-  const baseService = sortedServices[0]
 
   const hours = useMemo(() => {
     const h = []
@@ -158,42 +155,36 @@ export function QuickBooking() {
 
   useEffect(() => {
     const loadAllAvailability = async () => {
-      if (!activeCourts.length || !baseService || !tenantSlug) return
-      
+      if (!activeSpaces.length || !tenantSlug) return
       setLoadingAvailability(true)
       const newMap = new Map<string, boolean>()
       const dateStr = format(selectedDate, 'yyyy-MM-dd')
-      
       try {
-        // Cargar disponibilidad
-        const availabilityPromises = activeCourts.map(async (court) => {
+        const promises = activeSpaces.map(async (space) => {
           try {
-            const availability = await appointmentsApi.getAvailability(tenantSlug, {
-              professionalId: court.id,
-              serviceId: baseService.id,
+            const slots = await appointmentsApi.getAvailability(tenantSlug, {
+              serviceId: space.id,
               date: dateStr,
             })
-            availability.forEach((slot: TimeSlot) => {
-              const key = `${court.id}-${slot.time}`
-              newMap.set(key, slot.available)
+            slots.forEach((slot: TimeSlot) => {
+              newMap.set(`${space.id}-${slot.time}`, slot.available)
             })
-          } catch (error) {
-            console.error(`Error court ${court.id}:`, error)
+          } catch (e) {
+            console.error(`Error espacio ${space.id}:`, e)
           }
         })
-        
-        await Promise.all(availabilityPromises)
+        await Promise.all(promises)
         setAvailabilityMap(newMap)
       } catch (error) {
-        console.error("Error:", error)
+        console.error("Error disponibilidad:", error)
       } finally {
         setLoadingAvailability(false)
       }
     }
     loadAllAvailability()
-  }, [activeCourts, baseService, selectedDate, tenantSlug])
+  }, [activeSpaces, selectedDate, tenantSlug])
 
-  const isHourAvailable = (courtId: string, hour: number): boolean => {
+  const isHourAvailable = (spaceId: string, hour: number): boolean => {
     // El backend envía horas en UTC, pero el frontend genera horas locales
     // Necesitamos convertir la hora local a UTC para buscar en el mapa
     const timeLocal = `${hour.toString().padStart(2, '0')}:00`
@@ -209,13 +200,9 @@ export function QuickBooking() {
     // Asegurarse de que la hora UTC esté en el rango válido (0-23)
     const hourUTCNormalized = ((hourUTC % 24) + 24) % 24
     const timeUTC = `${hourUTCNormalized.toString().padStart(2, '0')}:00`
-    
-    // Buscar primero con la hora UTC (como viene del backend)
-    let available = availabilityMap.get(`${courtId}-${timeUTC}`)
-    
-    // Si no se encuentra, buscar con la hora local (por si acaso)
+    let available = availabilityMap.get(`${spaceId}-${timeUTC}`)
     if (available === undefined) {
-      available = availabilityMap.get(`${courtId}-${timeLocal}`)
+      available = availabilityMap.get(`${spaceId}-${timeLocal}`)
     }
     
     // Si la hora está explícitamente en el mapa, usar ese valor
@@ -248,14 +235,14 @@ export function QuickBooking() {
     return slotDate.getTime() < now.getTime()
   }
 
-  const isSlotAvailable = (courtId: string, slotIndex: number): boolean => {
+  const isSlotAvailable = (spaceId: string, slotIndex: number): boolean => {
     const slotHour = Math.floor((HOUR_START * 60 + slotIndex * SLOT_DURATION) / 60)
-    return isHourAvailable(courtId, slotHour) && !isSlotInPast(slotIndex)
+    return isHourAvailable(spaceId, slotHour) && !isSlotInPast(slotIndex)
   }
 
-  const getOccupiedBlocks = (courtId: string): OccupiedBlock[] => {
+  const getOccupiedBlocks = (spaceId: string): OccupiedBlock[] => {
     const blocks: OccupiedBlock[] = []
-    const appointments = dayAppointments[courtId] || []
+    const appointments = dayAppointments[spaceId] || []
     
     // Usar appointments reales para calcular bloques ocupados
     appointments.forEach(apt => {
@@ -309,7 +296,7 @@ export function QuickBooking() {
     return blocks.sort((a, b) => a.startSlot - b.startSlot)
   }
 
-  const isDurationAvailable = (courtId: string, startSlot: number, durationMinutes: number): boolean => {
+  const isDurationAvailable = (spaceId: string, startSlot: number, durationMinutes: number): boolean => {
     const slotsNeeded = durationMinutes / SLOT_DURATION
     const endSlot = startSlot + slotsNeeded
     
@@ -327,8 +314,7 @@ export function QuickBooking() {
       if (isSlotInPast(s)) return false
     }
     
-    // Verificar que no haya conflictos con appointments existentes
-    const appointments = dayAppointments[courtId] || []
+    const appointments = dayAppointments[spaceId] || []
     const startDate = new Date(selectedDate)
     startDate.setHours(startH, startM, 0, 0)
     const endDate = new Date(startDate)
@@ -350,8 +336,7 @@ export function QuickBooking() {
     // Si el turno termina a las 23:00, necesitamos que las horas 21 y 22 estén disponibles
     for (let m = startMinutes; m < endMinutes; m += 60) {
       const h = Math.floor(m / 60)
-      // No verificar la hora de finalización aquí, la verificaremos después
-      if (h < endH && !isHourAvailable(courtId, h)) return false
+      if (h < endH && !isHourAvailable(spaceId, h)) return false
     }
     
     // Verificar que el turno no exceda el horario de cierre
@@ -363,7 +348,7 @@ export function QuickBooking() {
     // Buscar en el mapa directamente las horas UTC disponibles
     for (let hUTC = 0; hUTC < 24; hUTC++) {
       const timeUTC = `${hUTC.toString().padStart(2, '0')}:00`
-      const available = availabilityMap.get(`${courtId}-${timeUTC}`)
+      const available = availabilityMap.get(`${spaceId}-${timeUTC}`)
       if (available === true) {
         lastAvailableHourUTC = Math.max(lastAvailableHourUTC, hUTC)
       }
@@ -374,7 +359,7 @@ export function QuickBooking() {
     if (lastAvailableHourUTC < 0) {
       for (let hUTC = 23; hUTC >= 0; hUTC--) {
         const timeUTC = `${hUTC.toString().padStart(2, '0')}:00`
-        const available = availabilityMap.get(`${courtId}-${timeUTC}`)
+        const available = availabilityMap.get(`${spaceId}-${timeUTC}`)
         if (available !== undefined) {
           // Si está marcado como false, significa que el backend generó el slot pero no está disponible
           // Esto indica que el horario de cierre es antes de esta hora
@@ -412,7 +397,7 @@ export function QuickBooking() {
     if (endHUTC <= lastAvailableHourUTC) {
       // Verificar que la hora de finalización esté disponible en el mapa (si está en el mapa)
       const endTimeUTC = `${endHUTC.toString().padStart(2, '0')}:00`
-      const endHourAvailable = availabilityMap.get(`${courtId}-${endTimeUTC}`)
+      const endHourAvailable = availabilityMap.get(`${spaceId}-${endTimeUTC}`)
       // Si está explícitamente marcado como false, no está disponible
       if (endHourAvailable === false) return false
       // Si no está en el mapa o está true, está disponible
@@ -421,31 +406,28 @@ export function QuickBooking() {
     return true
   }
 
-  const getDurationOptions = (courtId: string, startSlot: number): DurationOption[] => {
+  const getDurationOptions = (space: Service, startSlot: number): DurationOption[] => {
     const startTime = slotToTime(startSlot)
-    
-    return sortedServices.map(service => {
-      const available = isDurationAvailable(courtId, startSlot, service.duration)
-      const endTime = addMinutesToTime(startTime, service.duration)
-      return {
-        minutes: service.duration,
-        label: service.duration === 60 ? "1 hora" : service.duration === 90 ? "1h 30m" : "2 horas",
-        endTime,
-        available,
-        service: available ? service : null
-      }
-    })
+    const available = isDurationAvailable(space.id, startSlot, space.duration)
+    const endTime = addMinutesToTime(startTime, space.duration)
+    return [{
+      minutes: space.duration,
+      label: space.duration === 60 ? "1 hora" : space.duration === 90 ? "1h 30m" : `${space.duration / 60} horas`,
+      endTime,
+      available,
+      service: available ? space : null
+    }]
   }
 
-  const handleTimelineMouseMove = (court: Professional, e: React.MouseEvent<HTMLDivElement>) => {
+  const handleTimelineMouseMove = (space: Service, e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
     const percent = (x / rect.width) * 100
     const rawSlot = (percent / 100) * TOTAL_SLOTS
     const slot = Math.floor(rawSlot)
     
-    if (slot >= 0 && slot < TOTAL_SLOTS && isSlotAvailable(court.id, slot)) {
-      setHoveredSlot({ courtId: court.id, slot })
+    if (slot >= 0 && slot < TOTAL_SLOTS && isSlotAvailable(space.id, slot)) {
+      setHoveredSlot({ spaceId: space.id, slot })
     } else {
       setHoveredSlot(null)
     }
@@ -455,35 +437,29 @@ export function QuickBooking() {
     setHoveredSlot(null)
   }
 
-  const handleTimelineClick = (court: Professional, e: React.MouseEvent<HTMLDivElement>) => {
+  const handleTimelineClick = (space: Service, e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation()
-    
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
     const percent = (x / rect.width) * 100
     const rawSlot = (percent / 100) * TOTAL_SLOTS
     const slot = Math.floor(rawSlot)
-    
     if (slot < 0 || slot >= TOTAL_SLOTS) return
-    if (!isSlotAvailable(court.id, slot)) return
-    
-    if (activeSelection?.courtId === court.id && activeSelection?.startSlot === slot) {
+    if (!isSlotAvailable(space.id, slot)) return
+    if (activeSelection?.spaceId === space.id && activeSelection?.startSlot === slot) {
       setActiveSelection(null)
       setHoveredDuration(null)
       return
     }
-    
-    setActiveSelection({ courtId: court.id, startSlot: slot, court })
+    setActiveSelection({ spaceId: space.id, startSlot: slot, space })
     setHoveredDuration(null)
   }
 
   const handleSelectDuration = (option: DurationOption) => {
     if (!activeSelection || !option.available || !option.service) return
-    
     const startTime = slotToTime(activeSelection.startSlot)
-    
     setSelectedSlot({
-      court: activeSelection.court,
+      space: activeSelection.space,
       date: selectedDate,
       startTime,
       endTime: option.endTime,
@@ -519,8 +495,7 @@ export function QuickBooking() {
         customerFirstName: bookingForm.name,
         customerLastName: bookingForm.lastName,
         customerEmail: bookingForm.email,
-        serviceId: selectedSlot.service.id,
-        professionalId: selectedSlot.court.id,
+        serviceId: selectedSlot.space.id,
         startTime: startTime.toISOString(),
         status: 'CONFIRMED' as AppointmentStatus,
       })
@@ -549,7 +524,7 @@ export function QuickBooking() {
       setAvailabilityMap(prev => {
         const newMap = new Map(prev)
         for (let h = startH; h < endH; h++) {
-          newMap.set(`${selectedSlot.court.id}-${h.toString().padStart(2, '0')}:00`, false)
+          newMap.set(`${selectedSlot.space.id}-${h.toString().padStart(2, '0')}:00`, false)
         }
         return newMap
       })
@@ -568,58 +543,55 @@ export function QuickBooking() {
     setBookingSuccess(false)
   }
 
-  // Loading
-  if (loadingCourts || loadingServices) {
+  if (loadingServices) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a4d8c] to-[#1a6fc2]">
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-white/30 border-t-[#ccff00] rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white/80">Cargando canchas...</p>
+          <div className="w-16 h-16 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white/80">Cargando espacios...</p>
         </div>
       </div>
     )
   }
 
-  if (!activeCourts.length) {
+  if (!activeSpaces.length) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a4d8c] to-[#1a6fc2]">
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="text-center">
-          <div className="text-6xl mb-4">🎾</div>
-          <h2 className="text-xl font-semibold text-white">Sin canchas disponibles</h2>
+          <div className="text-6xl mb-4">🏢</div>
+          <h2 className="text-xl font-semibold text-white">Sin espacios configurados</h2>
+          <p className="text-white/70 mt-2">El administrador aún no ha cargado espacios comunes.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a4d8c] via-[#1565a8] to-[#1a6fc2]">
-      {/* Líneas decorativas de cancha */}
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 bottom-0 left-1/2 w-px bg-white/10" />
-        <div className="absolute inset-10 border border-white/5 rounded-xl" />
+        <div className="absolute top-0 bottom-0 left-1/2 w-px bg-slate-700/50" />
+        <div className="absolute inset-10 border border-slate-800/50 rounded-xl" />
       </div>
 
-      {/* Header */}
-      <div className="border-b border-white/10 bg-white/5 backdrop-blur-xl sticky top-0 z-30">
+      <div className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-6 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur flex items-center justify-center shadow-lg border border-white/20">
-                <span className="text-2xl">🎾</span>
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                <span className="text-2xl">🏢</span>
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">
-                  {tenant?.name || 'Reserva tu cancha'}
+                  {tenant?.name || 'Reservar espacios comunes'}
                 </h1>
-                <p className="text-sm text-white/60 flex items-center gap-1">
+                <p className="text-sm text-slate-400 flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
-                  {tenant?.address || 'Selecciona horario'}
+                  {tenant?.address || 'Selecciona fecha y horario'}
                 </p>
               </div>
             </div>
-            
-            <div className="hidden md:flex items-center gap-2 text-sm text-white/60 bg-white/10 px-3 py-1.5 rounded-full">
-              <div className="w-2 h-2 rounded-full bg-[#ccff00] animate-pulse" />
+            <div className="hidden md:flex items-center gap-2 text-sm text-slate-400 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               Reserva en segundos
             </div>
           </div>
@@ -627,7 +599,7 @@ export function QuickBooking() {
       </div>
 
       {/* Selector de fecha */}
-      <div className="border-b border-white/10 bg-white/5 backdrop-blur sticky top-[81px] z-20">
+      <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-[81px] z-20">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-center gap-3">
             <Button
@@ -641,7 +613,7 @@ export function QuickBooking() {
                 }
               }}
               disabled={isSameDay(selectedDate, days[0])}
-              className="text-white/60 hover:text-white hover:bg-white/10 h-10 w-10"
+              className="text-slate-400 hover:text-white hover:bg-slate-800 h-10 w-10"
             >
               <ChevronLeft className="w-5 h-5" />
             </Button>
@@ -661,8 +633,8 @@ export function QuickBooking() {
                     className={cn(
                       "flex flex-col items-center px-4 py-2 rounded-xl transition-all",
                       isSelected 
-                        ? "bg-[#ccff00] text-[#0a4d8c] shadow-lg shadow-[#ccff00]/30 font-bold" 
-                        : "bg-white/10 hover:bg-white/20 text-white border border-white/10"
+                        ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 font-bold" 
+                        : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
                     )}
                   >
                     <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">
@@ -674,7 +646,7 @@ export function QuickBooking() {
                     {isToday && (
                       <span className={cn(
                         "text-[9px] font-bold uppercase",
-                        isSelected ? "text-[#0a4d8c]" : "text-[#ccff00]"
+                        isSelected ? "text-slate-950" : "text-emerald-400"
                       )}>
                         Hoy
                       </span>
@@ -695,7 +667,7 @@ export function QuickBooking() {
                 }
               }}
               disabled={isSameDay(selectedDate, days[days.length - 1])}
-              className="text-white/60 hover:text-white hover:bg-white/10 h-10 w-10"
+              className="text-slate-400 hover:text-white hover:bg-slate-800 h-10 w-10"
             >
               <ChevronRight className="w-5 h-5" />
             </Button>
@@ -705,18 +677,17 @@ export function QuickBooking() {
 
       {/* Timeline Grid */}
       <div className="max-w-6xl mx-auto px-6 py-8 relative z-10">
-        <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden shadow-2xl">
-          
+        <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
           {/* Header con horas */}
-          <div className="flex border-b border-gray-200 bg-[#0a4d8c]">
-            <div className="w-48 shrink-0 p-4 border-r border-white/20">
-              <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Canchas</span>
+          <div className="flex border-b border-slate-700 bg-slate-800">
+            <div className="w-48 shrink-0 p-4 border-r border-slate-700">
+              <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Espacios</span>
             </div>
             <div className="flex-1 flex">
               {hours.map((h) => (
                 <div 
                   key={h}
-                  className="flex-1 p-3 text-center text-sm font-medium text-white/70 border-r border-white/10 last:border-r-0"
+                  className="flex-1 p-3 text-center text-sm font-medium text-slate-400 border-r border-slate-700 last:border-r-0"
                 >
                   {h}
                 </div>
@@ -728,36 +699,32 @@ export function QuickBooking() {
           <div className="relative">
             {loadingAvailability && (
               <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
-                <div className="w-8 h-8 border-3 border-[#0a4d8c]/30 border-t-[#0a4d8c] rounded-full animate-spin" />
+                <div className="w-8 h-8 border-3 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
               </div>
             )}
             
-            {activeCourts.map((court, idx) => {
-              const occupiedBlocks = getOccupiedBlocks(court.id)
-              const isActive = activeSelection?.courtId === court.id
-              
+            {activeSpaces.map((space, idx) => {
+              const occupiedBlocks = getOccupiedBlocks(space.id)
+              const isActive = activeSelection?.spaceId === space.id
               return (
-                <div 
-                  key={court.id}
+                <div
+                  key={space.id}
                   className={cn(
                     "flex border-b border-gray-100 last:border-b-0",
                     idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
                   )}
                 >
-                  {/* Court info */}
-                  <div className="w-48 shrink-0 p-4 border-r border-gray-200 flex flex-col justify-center bg-gradient-to-r from-[#0a4d8c]/5 to-transparent">
-                    <div className="font-semibold text-[#0a4d8c]">{court.firstName}</div>
-                    <div className="text-xs text-gray-500">{court.lastName}</div>
-                    {court.bio && (
-                      <div className="text-[10px] text-gray-400 mt-1 line-clamp-1">{court.bio}</div>
+                  <div className="w-48 shrink-0 p-4 border-r border-slate-700 flex flex-col justify-center bg-slate-800/50">
+                    <div className="font-semibold text-emerald-400">{space.name}</div>
+                    {space.description && (
+                      <div className="text-[10px] text-gray-400 mt-1 line-clamp-1">{space.description}</div>
                     )}
+                    <div className="text-xs text-gray-500 mt-0.5">{space.duration} min</div>
                   </div>
-                  
-                  {/* Timeline - superficie de cancha */}
                   <div
-                    className="flex-1 h-16 relative cursor-pointer select-none bg-gradient-to-b from-[#0a4d8c]/10 to-[#0a4d8c]/5"
-                    onClick={(e) => handleTimelineClick(court, e)}
-                    onMouseMove={(e) => handleTimelineMouseMove(court, e)}
+                    className="flex-1 h-16 relative cursor-pointer select-none bg-gradient-to-b from-slate-800/50 to-slate-800/30"
+                    onClick={(e) => handleTimelineClick(space, e)}
+                    onMouseMove={(e) => handleTimelineMouseMove(space, e)}
                     onMouseLeave={handleTimelineMouseLeave}
                   >
                     {/* Grid lines - horas */}
@@ -765,7 +732,7 @@ export function QuickBooking() {
                       {hours.map((_, i) => (
                         <div 
                           key={i} 
-                          className="flex-1 border-r border-[#0a4d8c]/10 last:border-r-0"
+                          className="flex-1 border-r border-slate-700/50 last:border-r-0"
                         />
                       ))}
                     </div>
@@ -778,7 +745,7 @@ export function QuickBooking() {
                           className="flex-1 relative"
                         >
                           <div 
-                            className="absolute top-0 bottom-0 w-px border-l border-[#0a4d8c]/5"
+                            className="absolute top-0 bottom-0 w-px border-l border-slate-700/50"
                             style={{ left: '50%' }}
                           />
                         </div>
@@ -786,7 +753,7 @@ export function QuickBooking() {
                     </div>
                     
                     {/* Línea central sutil */}
-                    <div className="absolute top-1/2 left-0 right-0 h-px bg-[#0a4d8c]/5" />
+                    <div className="absolute top-1/2 left-0 right-0 h-px bg-slate-700/50" />
                     
                     {/* Bloques ocupados - usando appointments reales */}
                     {occupiedBlocks.map((block, i) => {
@@ -797,7 +764,7 @@ export function QuickBooking() {
                       const endTime = slotToTime(block.endSlot)
                       
                       // Buscar el appointment correspondiente para mostrar info
-                      const appointment = dayAppointments[court.id]?.find(apt => {
+                      const appointment = dayAppointments[space.id]?.find(apt => {
                         const aptStart = new Date(apt.startTime)
                         const aptStartHour = aptStart.getHours()
                         const aptStartMin = aptStart.getMinutes()
@@ -833,14 +800,14 @@ export function QuickBooking() {
                     })}
                     
                     {/* Hover preview - muestra horario al pasar el mouse */}
-                    {hoveredSlot?.courtId === court.id && !isActive && (
+                    {hoveredSlot?.spaceId === space.id && !isActive && (
                       <>
                         <div 
-                          className="absolute top-0 bottom-0 w-1 bg-[#ccff00]/60 z-20"
+                          className="absolute top-0 bottom-0 w-1 bg-emerald-500/60 z-20"
                           style={{ left: `${slotToPercent(hoveredSlot.slot)}%` }}
                         />
                         <div 
-                          className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-[#0a4d8c] text-white text-xs font-bold rounded shadow-lg z-30 whitespace-nowrap"
+                          className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-slate-800 text-emerald-400 text-xs font-bold rounded shadow-lg z-30 whitespace-nowrap border border-slate-700"
                           style={{ left: `${slotToPercent(hoveredSlot.slot)}%` }}
                         >
                           {slotToTime(hoveredSlot.slot)}
@@ -851,7 +818,7 @@ export function QuickBooking() {
                     {/* Selección activa - línea */}
                     {isActive && (
                       <div 
-                        className="absolute top-0 bottom-0 w-1 bg-[#ccff00] z-30 shadow-lg shadow-[#ccff00]/50"
+                        className="absolute top-0 bottom-0 w-1 bg-emerald-500 z-30 shadow-lg shadow-emerald-500/50"
                         style={{ left: `${slotToPercent(activeSelection.startSlot)}%` }}
                       />
                     )}
@@ -859,7 +826,7 @@ export function QuickBooking() {
                     {/* Preview de duración */}
                     {isActive && hoveredDuration && (
                       <div 
-                        className="absolute top-1 bottom-1 bg-[#ccff00]/40 rounded border-2 border-[#ccff00] z-20"
+                        className="absolute top-1 bottom-1 bg-emerald-500/40 rounded border-2 border-emerald-500 z-20"
                         style={{
                           left: `${slotToPercent(activeSelection.startSlot)}%`,
                           width: `${(hoveredDuration / SLOT_DURATION / TOTAL_SLOTS) * 100}%`,
@@ -875,7 +842,7 @@ export function QuickBooking() {
           {/* Footer */}
           <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t border-gray-200">
             <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Info className="w-4 h-4 text-[#0a4d8c]" />
+              <Info className="w-4 h-4 text-emerald-400" />
               <span>Pasá el mouse para ver horarios • Tocá para reservar</span>
             </div>
             
@@ -885,7 +852,7 @@ export function QuickBooking() {
                 <span className="text-gray-500">Ocupado</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-5 h-4 rounded bg-[#ccff00]" />
+                <div className="w-5 h-4 rounded bg-emerald-500" />
                 <span className="text-gray-500">Tu reserva</span>
               </div>
             </div>
@@ -909,10 +876,10 @@ export function QuickBooking() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-sm text-gray-500">
-                    {activeSelection.court.fullName}
+                    {activeSelection.space.name}
                   </p>
-                  <p className="text-xl font-bold text-[#0a4d8c]">
-                    Desde las <span className="text-[#0a4d8c]">{slotToTime(activeSelection.startSlot)}</span>
+                  <p className="text-xl font-bold text-emerald-400">
+                    Desde las <span className="text-emerald-400">{slotToTime(activeSelection.startSlot)}</span>
                   </p>
                 </div>
                 <button
@@ -926,7 +893,7 @@ export function QuickBooking() {
               <p className="text-xs text-gray-500 mb-3">Elegí la duración:</p>
               
               <div className="space-y-2">
-                {getDurationOptions(activeSelection.courtId, activeSelection.startSlot).map((opt) => (
+                {getDurationOptions(activeSelection.space, activeSelection.startSlot).map((opt) => (
                   <button
                     key={opt.minutes}
                     disabled={!opt.available}
@@ -936,7 +903,7 @@ export function QuickBooking() {
                     className={cn(
                       "w-full px-4 py-3.5 rounded-xl text-sm font-medium transition-all flex items-center justify-between gap-3",
                       opt.available 
-                        ? "bg-[#0a4d8c]/10 hover:bg-[#ccff00] text-[#0a4d8c] hover:text-[#0a4d8c] border border-[#0a4d8c]/20 hover:border-[#ccff00] cursor-pointer hover:shadow-lg hover:shadow-[#ccff00]/20" 
+                        ? "bg-emerald-500/10 hover:bg-emerald-500 text-slate-950 hover:text-slate-950 border border-emerald-500/30 hover:border-emerald-500 cursor-pointer hover:shadow-lg hover:shadow-emerald-500/20" 
                         : "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
                     )}
                   >
@@ -947,8 +914,8 @@ export function QuickBooking() {
                       </span>
                     </div>
                     {opt.available && opt.service ? (
-                      <span className="font-bold text-lg text-[#0a4d8c]">
-                        ${Number(opt.service.price).toLocaleString()}
+                      <span className="font-bold text-lg text-emerald-400">
+                        {opt.service.price != null ? `$${Number(opt.service.price).toLocaleString()}` : 'Sin cargo'}
                       </span>
                     ) : (
                       <span className="text-xs">No disponible</span>
@@ -968,11 +935,11 @@ export function QuickBooking() {
             <CardContent className="p-0">
               {!bookingSuccess ? (
                 <>
-                  <div className="p-6 bg-gradient-to-r from-[#0a4d8c] to-[#1a6fc2] rounded-t-lg">
+                  <div className="p-6 bg-slate-800 border-b border-slate-700 rounded-t-lg">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="text-xl font-bold text-white">🎾 Confirmar Reserva</h3>
-                        <p className="text-blue-100/80 text-sm mt-1">Ingresa tus datos</p>
+                        <h3 className="text-xl font-bold text-white">🏢 Confirmar reserva</h3>
+                        <p className="text-slate-400 text-sm mt-1">Ingresá tus datos</p>
                       </div>
                       <button onClick={handleCloseModal} className="text-white/60 hover:text-white">
                         <X className="w-5 h-5" />
@@ -980,31 +947,37 @@ export function QuickBooking() {
                     </div>
                   </div>
 
-                  <div className="p-5 bg-[#0a4d8c]/5 border-b border-gray-200">
+                  <div className="p-5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-500">Cancha</span>
-                        <p className="font-semibold text-[#0a4d8c]">{selectedSlot.court.fullName}</p>
+                        <span className="text-slate-500">Espacio</span>
+                        <p className="font-semibold text-emerald-600 dark:text-emerald-400">{selectedSlot.space.name}</p>
                       </div>
                       <div>
-                        <span className="text-gray-500">Duración</span>
-                        <p className="font-semibold text-[#0a4d8c]">
-                          {selectedSlot.duration === 60 ? "1 hora" : selectedSlot.duration === 90 ? "1h 30min" : "2 horas"}
+                        <span className="text-slate-500">Duración</span>
+                        <p className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {selectedSlot.duration < 60
+                            ? `${selectedSlot.duration} min`
+                            : selectedSlot.duration % 60 === 0
+                              ? selectedSlot.duration === 60
+                                ? "1 hora"
+                                : `${selectedSlot.duration / 60} horas`
+                              : `${Math.floor(selectedSlot.duration / 60)}h ${selectedSlot.duration % 60}min`}
                         </p>
                       </div>
                       <div>
-                        <span className="text-gray-500">Fecha</span>
-                        <p className="font-semibold text-[#0a4d8c] capitalize">{format(selectedSlot.date, "EEEE d/MM", { locale: es })}</p>
+                        <span className="text-slate-500">Fecha</span>
+                        <p className="font-semibold text-emerald-600 dark:text-emerald-400 capitalize">{format(selectedSlot.date, "EEEE d/MM", { locale: es })}</p>
                       </div>
                       <div>
-                        <span className="text-gray-500">Horario</span>
-                        <p className="font-semibold text-[#0a4d8c]">{selectedSlot.startTime} - {selectedSlot.endTime}</p>
+                        <span className="text-slate-500">Horario</span>
+                        <p className="font-semibold text-emerald-600 dark:text-emerald-400">{selectedSlot.startTime} - {selectedSlot.endTime}</p>
                       </div>
                     </div>
-                    <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
-                      <span className="text-gray-600">Total a pagar</span>
-                      <span className="text-2xl font-bold text-[#0a4d8c]">
-                        ${Number(selectedSlot.service.price).toLocaleString()}
+                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                      <span className="text-slate-600">Costo</span>
+                      <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                        {selectedSlot.space.price != null ? `$${Number(selectedSlot.space.price).toLocaleString()}` : 'Sin cargo'}
                       </span>
                     </div>
                   </div>
@@ -1019,7 +992,7 @@ export function QuickBooking() {
                           value={bookingForm.name}
                           onChange={(e) => setBookingForm(p => ({ ...p, name: e.target.value }))}
                           placeholder="Juan"
-                          className="mt-1 border-gray-300 focus:border-[#0a4d8c] focus:ring-[#0a4d8c]/20"
+                          className="mt-1 border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                         />
                       </div>
                       <div>
@@ -1028,7 +1001,7 @@ export function QuickBooking() {
                           value={bookingForm.lastName}
                           onChange={(e) => setBookingForm(p => ({ ...p, lastName: e.target.value }))}
                           placeholder="Pérez"
-                          className="mt-1 border-gray-300 focus:border-[#0a4d8c] focus:ring-[#0a4d8c]/20"
+                          className="mt-1 border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                         />
                       </div>
                     </div>
@@ -1057,7 +1030,7 @@ export function QuickBooking() {
                       <Button
                         onClick={handleConfirmBooking}
                         disabled={isBooking || !bookingForm.name || !bookingForm.lastName || !bookingForm.email}
-                        className="flex-1 bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c] font-semibold"
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl"
                       >
                         {isBooking ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                         Confirmar
@@ -1067,28 +1040,28 @@ export function QuickBooking() {
                 </>
               ) : (
                 <div className="p-8 text-center">
-                  <div className="w-20 h-20 bg-[#ccff00] rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg shadow-[#ccff00]/30">
-                    <CheckCircle2 className="w-10 h-10 text-[#0a4d8c]" />
+                  <div className="w-20 h-20 bg-emerald-500/20 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-5">
+                    <CheckCircle2 className="w-10 h-10 text-emerald-500" />
                   </div>
-                  <h3 className="text-2xl font-bold text-[#0a4d8c] mb-2">¡Listo!</h3>
+                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">¡Listo!</h3>
                   <p className="text-gray-500 mb-6">Confirmación enviada a {bookingForm.email}</p>
                   
-                  <div className="bg-[#0a4d8c]/5 rounded-xl p-4 mb-6 text-left text-sm border border-[#0a4d8c]/10">
+                  <div className="bg-slate-100 dark:bg-slate-800/50 rounded-xl p-4 mb-6 text-left text-sm border border-slate-200 dark:border-slate-700">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <span className="text-gray-500">Cancha</span>
-                        <p className="font-semibold text-[#0a4d8c]">{selectedSlot.court.fullName}</p>
+                        <span className="text-gray-500">Espacio</span>
+                        <p className="font-semibold text-emerald-600 dark:text-emerald-400">{selectedSlot.space.name}</p>
                       </div>
                       <div>
                         <span className="text-gray-500">Horario</span>
-                        <p className="font-semibold text-[#0a4d8c]">{selectedSlot.startTime} - {selectedSlot.endTime}</p>
+                        <p className="font-semibold text-emerald-600 dark:text-emerald-400">{selectedSlot.startTime} - {selectedSlot.endTime}</p>
                       </div>
                     </div>
                   </div>
 
                   <Button 
                     onClick={handleCloseModal} 
-                    className="w-full bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c] font-semibold"
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl"
                   >
                     Nueva reserva
                   </Button>

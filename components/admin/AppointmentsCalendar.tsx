@@ -219,7 +219,7 @@ export function AppointmentsCalendar() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-[#0a4d8c]/20 border-t-[#0a4d8c] rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
       </div>
     )
   }
@@ -230,7 +230,7 @@ export function AppointmentsCalendar() {
       <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-            <h2 className="text-2xl font-bold text-[#0a4d8c]">📅 Gestión de Reservas</h2>
+            <h2 className="text-2xl font-bold text-emerald-400">📅 Gestión de Reservas</h2>
               <p className="text-sm text-gray-600 mt-1">
               {format(currentDate, "EEEE, d 'de' MMMM, yyyy", { locale: es })}
               </p>
@@ -268,7 +268,7 @@ export function AppointmentsCalendar() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Ocupación total del día</p>
-              <p className="text-3xl font-bold text-[#0a4d8c] mt-1">
+              <p className="text-3xl font-bold text-emerald-400 mt-1">
                 {globalOccupancy.toFixed(1)}%
               </p>
             </div>
@@ -289,7 +289,7 @@ export function AppointmentsCalendar() {
       {/* Timeline Grid - Todas las canchas juntas */}
       <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden shadow-xl">
         {/* Header con horas */}
-        <div className="flex border-b border-gray-200 bg-[#0a4d8c]">
+        <div className="flex border-b border-slate-700 bg-slate-800">
           <div className="w-48 shrink-0 p-4 border-r border-white/20">
             <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Canchas</span>
           </div>
@@ -320,31 +320,31 @@ export function AppointmentsCalendar() {
                 )}
               >
                 {/* Court info */}
-                <div className="w-48 shrink-0 p-4 border-r border-gray-200 flex flex-col justify-center bg-gradient-to-r from-[#0a4d8c]/5 to-transparent">
-                  <div className="font-semibold text-[#0a4d8c]">{court.firstName}</div>
+                <div className="w-48 shrink-0 p-4 border-r border-gray-200 flex flex-col justify-center bg-gradient-to-r from-emerald-500/5 to-transparent">
+                  <div className="font-semibold text-emerald-400">{court.firstName}</div>
                   <div className="text-xs text-gray-500">{court.lastName}</div>
                   {court.bio && (
                     <div className="text-[10px] text-gray-400 mt-1 line-clamp-1">{court.bio}</div>
                   )}
-                  <div className="text-[10px] text-[#0a4d8c] font-medium mt-1">
+                  <div className="text-[10px] text-emerald-400 font-medium mt-1">
                     {courtAppointments.length} reservas
                         </div>
                       </div>
                       
                 {/* Timeline */}
-                <div className="flex-1 h-16 relative select-none bg-gradient-to-b from-[#0a4d8c]/10 to-[#0a4d8c]/5">
+                <div className="flex-1 h-16 relative select-none bg-gradient-to-b from-slate-800/50 to-slate-800/30">
                   {/* Grid lines */}
                   <div className="absolute inset-0 flex">
                     {hours.map((_, i) => (
                       <div 
                         key={i} 
-                        className="flex-1 border-r border-[#0a4d8c]/10 last:border-r-0"
+                        className="flex-1 border-r border-slate-700/50 last:border-r-0"
                       />
                     ))}
                     </div>
                   
                   {/* Línea central */}
-                  <div className="absolute top-1/2 left-0 right-0 h-px bg-[#0a4d8c]/5" />
+                  <div className="absolute top-1/2 left-0 right-0 h-px bg-slate-700/50" />
                   
                   {/* Turnos como bloques */}
                   {courtAppointments.map((apt) => {
@@ -369,10 +369,10 @@ export function AppointmentsCalendar() {
                         className={cn(
                           "absolute top-1 bottom-1 rounded-sm cursor-pointer transition-all hover:opacity-90 z-10 shadow-sm border-2",
                           apt.status === AppointmentStatus.CONFIRMED 
-                            ? "bg-[#ccff00] text-[#0a4d8c] border-[#ccff00]" 
+                            ? "bg-emerald-500 text-emerald-400 border-emerald-500" 
                             : apt.status === AppointmentStatus.PENDING
-                            ? "bg-[#ccff00]/70 text-[#0a4d8c] border-[#ccff00]"
-                            : "bg-[#0a4d8c]/70 text-white border-[#0a4d8c]",
+                            ? "bg-emerald-500/70 text-emerald-400 border-emerald-500"
+                            : "bg-slate-700 text-white border-slate-600",
                           isLongDuration && "ring-2 ring-amber-400/50"
                         )}
                         style={{
@@ -406,17 +406,17 @@ export function AppointmentsCalendar() {
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t border-gray-200">
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            <Clock className="w-4 h-4 text-[#0a4d8c]" />
+            <Clock className="w-4 h-4 text-emerald-400" />
             <span>Click en una reserva para ver detalles</span>
           </div>
           
           <div className="flex items-center gap-5 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-5 h-4 rounded bg-[#ccff00]" />
+              <div className="w-5 h-4 rounded bg-emerald-500" />
               <span className="text-gray-500">Confirmada</span>
                       </div>
                       <div className="flex items-center gap-2">
-              <div className="w-5 h-4 rounded bg-[#ccff00]/70 border-2 border-[#ccff00]" />
+              <div className="w-5 h-4 rounded bg-emerald-500/70 border-2 border-emerald-500" />
               <span className="text-gray-500">Pendiente</span>
             </div>
           </div>
@@ -427,7 +427,7 @@ export function AppointmentsCalendar() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-white/95 border-white/20">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-[#ccff00]">
+            <p className="text-2xl font-bold text-emerald-400">
               {dayAppointments.filter(a => a.status === AppointmentStatus.CONFIRMED).length}
             </p>
             <p className="text-sm text-gray-600">Confirmadas</p>
@@ -435,7 +435,7 @@ export function AppointmentsCalendar() {
         </Card>
         <Card className="bg-white/95 border-white/20">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-[#ccff00]/70">
+            <p className="text-2xl font-bold text-emerald-400/70">
               {dayAppointments.filter(a => a.status === AppointmentStatus.PENDING).length}
             </p>
             <p className="text-sm text-gray-600">Pendientes</p>
@@ -443,7 +443,7 @@ export function AppointmentsCalendar() {
         </Card>
         <Card className="bg-white/95 border-white/20">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-[#0a4d8c]">
+            <p className="text-2xl font-bold text-emerald-400">
               {dayAppointments.filter(a => a.status === AppointmentStatus.COMPLETED).length}
             </p>
             <p className="text-sm text-gray-600">Completadas</p>
@@ -451,7 +451,7 @@ export function AppointmentsCalendar() {
         </Card>
         <Card className="bg-white/95 border-white/20">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-[#0a4d8c]">
+            <p className="text-2xl font-bold text-emerald-400">
               {dayAppointments.length}
             </p>
             <p className="text-sm text-gray-600">Total Reservas</p>
@@ -463,7 +463,7 @@ export function AppointmentsCalendar() {
       {selectedAppointment && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md bg-white shadow-2xl">
-            <CardHeader className="bg-gradient-to-r from-[#0a4d8c] to-[#1a6fc2]">
+            <CardHeader className="bg-gradient-to-r from-slate-800 to-slate-700">
               <div className="flex justify-between items-center">
                 <CardTitle className="text-white">Detalles de la Reserva</CardTitle>
                 <Button 
@@ -481,7 +481,7 @@ export function AppointmentsCalendar() {
                 <div>
                   <Label className="text-gray-600 text-xs">Cliente</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <User className="w-4 h-4 text-[#0a4d8c]" />
+                    <User className="w-4 h-4 text-emerald-400" />
                     <p className="text-gray-900 font-semibold">
                       {selectedAppointment.customer.firstName} {selectedAppointment.customer.lastName}
                     </p>
@@ -491,10 +491,10 @@ export function AppointmentsCalendar() {
                 <div>
                   <Label className="text-gray-600 text-xs">Email</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <Mail className="w-4 h-4 text-[#0a4d8c]" />
+                    <Mail className="w-4 h-4 text-emerald-400" />
                     <a 
                       href={`mailto:${selectedAppointment.customer.email}`}
-                      className="text-[#0a4d8c] hover:underline"
+                      className="text-emerald-400 hover:underline"
                     >
                       {selectedAppointment.customer.email}
                     </a>
@@ -536,7 +536,7 @@ export function AppointmentsCalendar() {
                 {selectedAppointment.service.price && (
                   <div>
                     <Label className="text-gray-600 text-xs">Precio</Label>
-                    <p className="text-[#0a4d8c] font-bold text-lg mt-1">
+                    <p className="text-emerald-400 font-bold text-lg mt-1">
                       ${Number(selectedAppointment.service.price).toLocaleString()}
                     </p>
                             </div>
@@ -546,9 +546,9 @@ export function AppointmentsCalendar() {
                   <Label className="text-gray-600 text-xs">Estado</Label>
                   <div className="mt-1">
                     {selectedAppointment.status === AppointmentStatus.CONFIRMED ? (
-                      <Badge className="bg-[#ccff00] text-[#0a4d8c]">Confirmado</Badge>
+                      <Badge className="bg-emerald-500 text-emerald-400">Confirmado</Badge>
                     ) : selectedAppointment.status === AppointmentStatus.PENDING ? (
-                      <Badge className="bg-[#ccff00]/70 text-[#0a4d8c] border-2 border-[#ccff00]">Pendiente</Badge>
+                      <Badge className="bg-emerald-500/70 text-emerald-400 border-2 border-emerald-500">Pendiente</Badge>
                     ) : (
                       <Badge variant="secondary">Completado</Badge>
                     )}
@@ -563,7 +563,7 @@ export function AppointmentsCalendar() {
                       handleQuickAction(selectedAppointment.id, "confirm")
                       setSelectedAppointment(null)
                     }}
-                    className="flex-1 bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c] font-semibold"
+                    className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
                   >
                     Confirmar
                   </Button>

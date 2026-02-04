@@ -19,7 +19,7 @@ export interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null
   isLoading: boolean
-  login: (email: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
   logout: () => void
   setUser: (user: AuthUser | null) => void
   isAuthenticated: boolean
@@ -53,18 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser()
   }, [])
 
-  const login = async (email: string) => {
-    try {
-      const data = await authApi.login({ email })
-      
-      // En desarrollo, mostrar el link en consola
-      if (data.magicLink) {
-        console.log('🔗 Magic Link (solo en desarrollo):', data.magicLink)
-        alert(`En desarrollo: Magic link generado. Abre este link: ${data.magicLink}`)
-      }
-    } catch (error: any) {
-      console.error('Login error:', error)
-      throw error
+  const login = async (email: string, password: string) => {
+    const data = await authApi.login({ email, password })
+    if (data.user) {
+      setUser(data.user as AuthUser)
+      router.push('/admin/dashboard')
     }
   }
 

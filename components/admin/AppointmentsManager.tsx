@@ -156,7 +156,7 @@ export function AppointmentsManager() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Gestión de Turnos</h2>
+          <h2 className="text-2xl font-bold">Gestión de reservas</h2>
           <p className="text-gray-600">Administra todos los turnos agendados</p>
         </div>
       </div>
@@ -181,7 +181,7 @@ export function AppointmentsManager() {
       {/* Appointments Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Turnos ({filteredAppointments.length})</CardTitle>
+          <CardTitle>Reservas ({filteredAppointments.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {filteredAppointments.length === 0 ? (
