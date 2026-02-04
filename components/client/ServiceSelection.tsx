@@ -25,7 +25,8 @@ export function ServiceSelection({ tenant, onSelect }: ServiceSelectionProps) {
   if (!services || services.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">No hay servicios disponibles en este momento</p>
+        <div className="text-6xl mb-4">🎾</div>
+        <p className="text-gray-500">No hay tipos de turno disponibles en este momento</p>
       </div>
     )
   }
@@ -36,36 +37,58 @@ export function ServiceSelection({ tenant, onSelect }: ServiceSelectionProps) {
   if (activeServices.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">No hay servicios disponibles en este momento</p>
+        <div className="text-6xl mb-4">🎾</div>
+        <p className="text-gray-500">No hay tipos de turno disponibles en este momento</p>
       </div>
     )
   }
 
+  // Helper para formatear duración
+  const formatDuration = (minutes: number) => {
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60)
+      const mins = minutes % 60
+      return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`
+    }
+    return `${minutes} min`
+  }
+
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Selecciona un Servicio</h2>
+      <h2 className="text-2xl font-bold mb-2">🎾 Reserva tu Cancha</h2>
+      <p className="text-gray-600 mb-6">Selecciona la duración del turno</p>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {activeServices.map((service) => (
           <Card
             key={service.id}
-            className="cursor-pointer hover:shadow-lg transition-all hover:scale-105 border-2"
+            className="cursor-pointer hover:shadow-lg transition-all hover:scale-105 border-2 overflow-hidden"
             style={{
               borderColor: 'transparent',
-              '--hover-border-color': tenant?.primaryColor || '#3b82f6',
-            } as React.CSSProperties & { '--hover-border-color': string }}
+            }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = tenant?.primaryColor || '#3b82f6'
+              e.currentTarget.style.borderColor = tenant?.primaryColor || '#22c55e'
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = 'transparent'
             }}
             onClick={() => onSelect(service)}
           >
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-3">
-                <h4 className="font-semibold text-lg">{service.name}</h4>
+            {/* Header con gradiente verde pádel */}
+            <div 
+              className="py-4 px-6 text-white"
+              style={{
+                background: `linear-gradient(135deg, ${tenant?.primaryColor || '#22c55e'} 0%, ${tenant?.primaryColor ? tenant.primaryColor + 'dd' : '#16a34a'} 100%)`
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                <span className="text-2xl font-bold">{formatDuration(service.duration)}</span>
               </div>
+            </div>
+
+            <CardContent className="p-5">
+              <h4 className="font-semibold text-lg mb-2">{service.name}</h4>
               
               {service.description && (
                 <p className="text-sm text-gray-600 mb-4">
@@ -73,19 +96,21 @@ export function ServiceSelection({ tenant, onSelect }: ServiceSelectionProps) {
                 </p>
               )}
               
-              <div className="flex justify-between items-center text-sm">
-                <div className="flex items-center gap-1 text-gray-600">
-                  <Clock className="w-4 h-4" />
-                  <span>{service.duration} min</span>
-                </div>
+              <div className="flex justify-between items-center">
+                <Badge 
+                  variant="outline" 
+                  className="border-green-500 text-green-700"
+                >
+                  Turno de pádel
+                </Badge>
                 
                 {service.price && (
                   <div 
-                    className="flex items-center gap-1 font-semibold"
-                    style={{ color: tenant?.primaryColor || '#3b82f6' }}
+                    className="flex items-center gap-1 font-bold text-lg"
+                    style={{ color: tenant?.primaryColor || '#22c55e' }}
                   >
                     <DollarSign className="w-4 h-4" />
-                    <span>${Number(service.price).toLocaleString()}</span>
+                    <span>{Number(service.price).toLocaleString()}</span>
                   </div>
                 )}
               </div>

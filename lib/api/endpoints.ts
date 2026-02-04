@@ -118,6 +118,10 @@ export const appointmentsApi = {
     });
     return apiClient.get<TimeSlot[]>(`/appointments/availability?${params.toString()}`);
   },
+  // Público: Obtener appointments del día (para visualización)
+  getDayAppointments: (tenantSlug: string, date: string) => {
+    return apiClient.get<any[]>(`/appointments/day?tenantSlug=${tenantSlug}&date=${date}`);
+  },
 };
 
 // ============================================

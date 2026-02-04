@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Label } from "@/components/ui/label"
 import { 
   useAppointments, 
   useUpdateAppointment,
@@ -19,36 +20,36 @@ import {
   Calendar as CalendarIcon,
   Clock,
   User,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
+  Mail,
+  X,
   Loader2,
-  TrendingUp,
-  TrendingDown,
-  Copy,
-  Share2,
 } from "lucide-react"
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isToday, addWeeks, subWeeks, startOfDay, parseISO, addMinutes, setHours, setMinutes } from "date-fns"
+import { format, startOfDay, isSameDay, isToday, addDays, subDays, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
 import { AppointmentStatus } from "@/lib/api/types"
 import type { TimeSlot } from "@/lib/api/types"
+import { cn } from "@/lib/utils"
 
-type ViewMode = "day" | "week"
+const HOUR_START = 8
+const HOUR_END = 24
+const TOTAL_HOURS = HOUR_END - HOUR_START
+const SLOT_DURATION = 30
+const TOTAL_SLOTS = (TOTAL_HOURS * 60) / SLOT_DURATION
 
-interface ProfessionalDayData {
-  professional: any
-  appointments: any[]
-  availableSlots: TimeSlot[]
-  occupiedSlots: number
-  totalSlots: number
-  occupancyPercentage: number
-  freeSlots: TimeSlot[]
+const slotToPercent = (slot: number): number => {
+  return (slot / TOTAL_SLOTS) * 100
+}
+
+const timeToSlot = (time: string): number => {
+  const [h, m] = time.split(':').map(Number)
+  const totalMinutes = h * 60 + m
+  return (totalMinutes - HOUR_START * 60) / SLOT_DURATION
 }
 
 export function AppointmentsCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState<ViewMode>("day")
+  const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null)
   const { tenantId, tenant } = useTenantContext()
   const { data: appointments, isLoading: loadingAppointments } = useAppointments()
   const { data: professionals, isLoading: loadingProfessionals } = useProfessionals()
@@ -57,46 +58,37 @@ export function AppointmentsCalendar() {
   const [availabilityData, setAvailabilityData] = useState<Record<string, TimeSlot[]>>({})
 
   const isLoading = loadingAppointments || loadingProfessionals || loadingServices
+  const activeCourts = useMemo(() => professionals?.filter(c => c.isActive) || [], [professionals])
+  const baseService = useMemo(() => services?.find(s => s.isActive), [services])
 
-  // Calcular rango de fechas según el modo de vista
-  const dateRange = useMemo(() => {
-    if (viewMode === "day") {
-      return [currentDate]
-    } else {
-      const weekStart = startOfWeek(currentDate, { locale: es, weekStartsOn: 1 })
-      const weekEnd = endOfWeek(currentDate, { locale: es, weekStartsOn: 1 })
-      return eachDayOfInterval({ start: weekStart, end: weekEnd })
+  const hours = useMemo(() => {
+    const h = []
+    for (let i = HOUR_START; i < HOUR_END; i++) {
+      h.push(i)
     }
-  }, [currentDate, viewMode])
+    return h
+  }, [])
 
-  // Cargar disponibilidad para cada profesional y servicio
+  // Cargar disponibilidad
   useEffect(() => {
-    if (!professionals || !services || !tenant?.slug || dateRange.length === 0) return
+    if (!activeCourts.length || !baseService || !tenant?.slug) return
 
     const loadAvailability = async () => {
       const newAvailability: Record<string, TimeSlot[]> = {}
+      const dateStr = format(currentDate, 'yyyy-MM-dd')
 
-      for (const date of dateRange) {
-        const dateStr = format(date, 'yyyy-MM-dd')
-        
-        for (const professional of professionals.filter(p => p.isActive)) {
-          // Usar el primer servicio disponible para calcular disponibilidad
-          const firstService = services.find(s => s.isActive)
-          if (!firstService) continue
-
-          const key = `${professional.id}-${dateStr}`
-          
+      for (const court of activeCourts) {
+        const key = `${court.id}-${dateStr}`
           try {
             const slots = await appointmentsApi.getAvailability(tenant.slug, {
-              professionalId: professional.id,
-              serviceId: firstService.id,
+            professionalId: court.id,
+            serviceId: baseService.id,
               date: dateStr,
             })
             newAvailability[key] = slots || []
           } catch (error) {
-            console.error(`Error loading availability for ${professional.id} on ${dateStr}:`, error)
+          console.error(`Error loading availability for ${court.id}:`, error)
             newAvailability[key] = []
-          }
         }
       }
 
@@ -104,144 +96,90 @@ export function AppointmentsCalendar() {
     }
 
     loadAvailability()
-  }, [professionals, services, tenant?.slug, dateRange])
+  }, [activeCourts, baseService, tenant?.slug, currentDate])
 
-  // Filtrar turnos por rango de fechas
-  const filteredAppointments = useMemo(() => {
+  // Filtrar turnos del día actual
+  const dayAppointments = useMemo(() => {
     if (!appointments) return []
     
     return appointments.filter(apt => {
       const aptDate = startOfDay(parseISO(apt.startTime))
-      return dateRange.some(date => isSameDay(aptDate, date))
+      return isSameDay(aptDate, currentDate) && apt.status !== AppointmentStatus.CANCELLED
     })
-  }, [appointments, dateRange])
+  }, [appointments, currentDate])
 
-  // Agrupar turnos por profesional y día, eliminando duplicados
-  const appointmentsByProfessionalAndDay = useMemo(() => {
-    const grouped: Record<string, Record<string, any[]>> = {}
+  // Agrupar turnos por cancha
+  const appointmentsByCourt = useMemo(() => {
+    const grouped: Record<string, any[]> = {}
     
-    if (!professionals) return grouped
-
-    // Primero, eliminar duplicados de filteredAppointments
-    const appointmentsMap = new Map<string, (typeof filteredAppointments)[number]>()
-    
-    filteredAppointments.forEach((appointment) => {
-      const startTime = new Date(parseISO(appointment.startTime))
-      const roundedTime = new Date(startTime)
-      roundedTime.setSeconds(0, 0) // Redondear a minutos
-      
-      const uniqueKey = `${appointment.customerId}-${appointment.serviceId}-${appointment.professionalId}-${roundedTime.toISOString()}`
-      
-      if (!appointmentsMap.has(uniqueKey)) {
-        appointmentsMap.set(uniqueKey, appointment)
-      } else {
-        // Mantener el más antiguo (ID menor)
-        const existing = appointmentsMap.get(uniqueKey)!
-        if (appointment.id < existing.id) {
-          appointmentsMap.set(uniqueKey, appointment)
-        }
-      }
-    })
-    
-    const uniqueAppointments = Array.from(appointmentsMap.values())
-
-    professionals.forEach(professional => {
-      grouped[professional.id] = {}
-      
-      dateRange.forEach(date => {
-        const dateKey = format(date, "yyyy-MM-dd")
-        grouped[professional.id][dateKey] = uniqueAppointments
-          .filter(apt => {
-            const aptDate = startOfDay(parseISO(apt.startTime))
-            return apt.professionalId === professional.id && isSameDay(aptDate, date)
-          })
+    activeCourts.forEach(court => {
+      grouped[court.id] = dayAppointments
+        .filter(apt => apt.professionalId === court.id)
           .sort((a, b) => {
             const timeA = parseISO(a.startTime).getTime()
             const timeB = parseISO(b.startTime).getTime()
             return timeA - timeB
-          })
       })
     })
     
     return grouped
-  }, [filteredAppointments, dateRange, professionals])
+  }, [dayAppointments, activeCourts])
 
-  // Calcular datos por profesional y día
-  const professionalDayData = useMemo(() => {
-    if (!professionals || !services) return []
+  // Calcular ocupación global
+  const globalOccupancy = useMemo(() => {
+    let totalSlots = 0
+    let occupiedSlots = 0
 
-    const data: ProfessionalDayData[] = []
-
-    dateRange.forEach(date => {
-      const dateStr = format(date, 'yyyy-MM-dd')
+    activeCourts.forEach(court => {
+      const dateStr = format(currentDate, 'yyyy-MM-dd')
+      const key = `${court.id}-${dateStr}`
+      const slots = availabilityData[key] || []
+      const courtAppointments = appointmentsByCourt[court.id] || []
       
-      professionals
-        .filter(p => p.isActive)
-        .forEach(professional => {
-          const key = `${professional.id}-${dateStr}`
-          const slots = availabilityData[key] || []
-          const professionalAppointments = appointmentsByProfessionalAndDay[professional.id]?.[dateStr] || []
-          
-          // Filtrar solo turnos confirmados o pendientes (no cancelados)
-          const activeAppointments = professionalAppointments.filter(
-            apt => apt.status !== AppointmentStatus.CANCELLED
-          )
-
-          const occupiedSlots = activeAppointments.length
-          const totalSlots = slots.length
-          const occupancyPercentage = totalSlots > 0 ? (occupiedSlots / totalSlots) * 100 : 0
-          
-          // Slots libres (disponibles y no ocupados)
-          const occupiedTimes = new Set(
-            activeAppointments.map(apt => format(parseISO(apt.startTime), 'HH:mm'))
-          )
-          const freeSlots = slots.filter(
-            slot => slot.available && !occupiedTimes.has(slot.time)
-          )
-
-          data.push({
-            professional,
-            appointments: professionalAppointments,
-            availableSlots: slots,
-            occupiedSlots,
-            totalSlots,
-            occupancyPercentage,
-            freeSlots,
-          })
-        })
+      totalSlots += slots.length
+      occupiedSlots += courtAppointments.length
     })
 
-    return data
-  }, [professionals, services, availabilityData, appointmentsByProfessionalAndDay, dateRange])
+    return totalSlots > 0 ? (occupiedSlots / totalSlots) * 100 : 0
+  }, [availabilityData, appointmentsByCourt, activeCourts, currentDate])
 
-  const getStatusIcon = (status: AppointmentStatus) => {
-    switch (status) {
-      case AppointmentStatus.CONFIRMED:
-        return <CheckCircle className="w-4 h-4 text-green-600" />
-      case AppointmentStatus.PENDING:
-        return <AlertCircle className="w-4 h-4 text-yellow-600" />
-      case AppointmentStatus.CANCELLED:
-        return <XCircle className="w-4 h-4 text-red-600" />
-      case AppointmentStatus.COMPLETED:
-        return <CheckCircle className="w-4 h-4" style={{ color: '#6E52FF' }} />
-      default:
-        return <Clock className="w-4 h-4 text-gray-600" />
-    }
+  // Helper para calcular posición de turnos
+  const getAppointmentPosition = (appointment: any) => {
+    // Parsear como fecha local (no UTC) para que coincida con lo que reservó el usuario
+    const start = new Date(appointment.startTime)
+    const end = new Date(appointment.endTime)
+    
+    // Usar hora local del navegador
+    const startHour = start.getHours()
+    const startMin = start.getMinutes()
+    const startTimeStr = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`
+    
+    const startSlot = timeToSlot(startTimeStr)
+    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+    const durationSlots = durationMinutes / SLOT_DURATION
+    
+    const leftPercent = slotToPercent(startSlot)
+    const widthPercent = slotToPercent(durationSlots)
+    
+    return { leftPercent, widthPercent, startTimeStr }
   }
 
-  const getStatusColor = (status: AppointmentStatus) => {
-    switch (status) {
-      case AppointmentStatus.CONFIRMED:
-        return "bg-green-50 border-green-200"
-      case AppointmentStatus.PENDING:
-        return "bg-yellow-50 border-yellow-200"
-      case AppointmentStatus.CANCELLED:
-        return "bg-red-50 border-red-200"
-      case AppointmentStatus.COMPLETED:
-        return "" // Se maneja con estilo inline para el color slotia
-      default:
-        return "bg-gray-50 border-gray-200"
-    }
+  // Obtener bloques ocupados (para mostrar como en QuickBooking)
+  const getOccupiedBlocks = (courtId: string) => {
+    const appointments = appointmentsByCourt[courtId] || []
+    const blocks: Array<{ startSlot: number; endSlot: number }> = []
+    
+    appointments.forEach(apt => {
+      const start = parseISO(apt.startTime)
+      const end = parseISO(apt.endTime)
+      const startSlot = timeToSlot(format(start, 'HH:mm'))
+      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+      const endSlot = startSlot + (durationMinutes / SLOT_DURATION)
+      
+      blocks.push({ startSlot, endSlot })
+    })
+    
+    return blocks
   }
 
   const handleQuickAction = async (id: string, action: "confirm" | "cancel") => {
@@ -266,27 +204,12 @@ export function AppointmentsCalendar() {
     }
   }
 
-  const copyFreeSlots = (freeSlots: TimeSlot[], professionalName: string, date: Date) => {
-    const dateStr = format(date, "dd/MM/yyyy")
-    const slotsStr = freeSlots.slice(0, 10).map(s => s.time).join(", ")
-    const text = `Horarios disponibles para ${professionalName} el ${dateStr}: ${slotsStr}${freeSlots.length > 10 ? ` y ${freeSlots.length - 10} más` : ''}`
-    
-    navigator.clipboard.writeText(text)
-    toast.success("Horarios copiados al portapapeles")
-  }
-
   const navigateDate = (direction: "prev" | "next") => {
-    if (viewMode === "day") {
       setCurrentDate(prev => {
         const newDate = new Date(prev)
         newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1))
         return newDate
       })
-    } else {
-      setCurrentDate(prev => 
-        direction === "next" ? addWeeks(prev, 1) : subWeeks(prev, 1)
-      )
-    }
   }
 
   const goToToday = () => {
@@ -296,7 +219,7 @@ export function AppointmentsCalendar() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+        <div className="w-8 h-8 border-4 border-[#0a4d8c]/20 border-t-[#0a4d8c] rounded-full animate-spin" />
       </div>
     )
   }
@@ -304,50 +227,28 @@ export function AppointmentsCalendar() {
   return (
     <div className="space-y-6">
       {/* Header con controles */}
-      <Card>
-        <CardHeader>
+      <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <CardTitle className="text-2xl">Gestión de Turnos</CardTitle>
+            <h2 className="text-2xl font-bold text-[#0a4d8c]">📅 Gestión de Reservas</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Vista {viewMode === "day" ? "diaria" : "semanal"} - Organizado por profesional
+              {format(currentDate, "EEEE, d 'de' MMMM, yyyy", { locale: es })}
               </p>
             </div>
             
-            <div className="flex items-center gap-2">
-              {/* Selector de vista */}
-              <div className="flex bg-gray-100 rounded-lg p-1">
-                <Button
-                  variant={viewMode === "day" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setViewMode("day")}
-                  className="rounded-md"
-                >
-                  Día
-                </Button>
-                <Button
-                  variant={viewMode === "week" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setViewMode("week")}
-                  className="rounded-md"
-                >
-                  Semana
-                </Button>
-              </div>
-
-              {/* Navegación */}
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => navigateDate("prev")}
+              className="border-gray-300"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
                 <Button
                   variant="outline"
                   onClick={goToToday}
-                  className="min-w-[100px]"
+              className="min-w-[100px] border-gray-300"
                 >
                   Hoy
                 </Button>
@@ -355,330 +256,330 @@ export function AppointmentsCalendar() {
                   variant="outline"
                   size="icon"
                   onClick={() => navigateDate("next")}
+              className="border-gray-300"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
             </div>
-          </div>
 
-          {/* Fecha actual */}
-          <div className="mt-4">
-            <div className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-              <CalendarIcon className="w-5 h-5" />
-              {viewMode === "day" 
-                ? format(currentDate, "EEEE, d 'de' MMMM, yyyy", { locale: es })
-                : `${format(dateRange[0], "d MMM", { locale: es })} - ${format(dateRange[dateRange.length - 1], "d MMM, yyyy", { locale: es })}`
-              }
+        {/* Ocupación global */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Ocupación total del día</p>
+              <p className="text-3xl font-bold text-[#0a4d8c] mt-1">
+                {globalOccupancy.toFixed(1)}%
+              </p>
+            </div>
+            <div className="w-64">
+              <Progress 
+                value={globalOccupancy} 
+                className="h-3"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>{dayAppointments.length} reservas</span>
+                <span>{activeCourts.length} canchas</span>
+              </div>
             </div>
           </div>
-        </CardHeader>
-      </Card>
+        </div>
+          </div>
 
-      {/* Vista por profesional */}
-      {viewMode === "day" ? (
-        // Vista diaria por profesional
-        <div className="space-y-6">
-          {professionalDayData
-            .filter(data => dateRange.some(d => isSameDay(d, currentDate)))
-            .map((data) => {
-              const dayData = professionalDayData.find(
-                d => d.professional.id === data.professional.id && 
-                     dateRange.some(date => isSameDay(date, currentDate))
-              )
-              
-              if (!dayData) return null
+      {/* Timeline Grid - Todas las canchas juntas */}
+      <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden shadow-xl">
+        {/* Header con horas */}
+        <div className="flex border-b border-gray-200 bg-[#0a4d8c]">
+          <div className="w-48 shrink-0 p-4 border-r border-white/20">
+            <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Canchas</span>
+          </div>
+          <div className="flex-1 flex">
+            {hours.map((h) => (
+              <div 
+                key={h}
+                className="flex-1 p-3 text-center text-sm font-medium text-white/70 border-r border-white/10 last:border-r-0"
+              >
+                {h}
+            </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Courts */}
+        <div className="relative">
+          {activeCourts.map((court, idx) => {
+            const occupiedBlocks = getOccupiedBlocks(court.id)
+            const courtAppointments = appointmentsByCourt[court.id] || []
 
               return (
-                <Card key={data.professional.id} className="overflow-hidden">
-                  <CardHeader className="border-b" style={{ background: 'linear-gradient(90deg, #6E52FF20 0%, #C7387020 100%)' }}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: '#6E52FF' }}>
-                          {data.professional.firstName[0]}{data.professional.lastName[0]}
-                        </div>
-                        <div>
-                          <CardTitle className="text-xl">{data.professional.fullName}</CardTitle>
-                          <p className="text-sm text-gray-600">
-                            {dayData.occupiedSlots} turnos programados • {dayData.freeSlots.length} slots libres
-                          </p>
+              <div 
+                key={court.id}
+                className={cn(
+                  "flex border-b border-gray-100 last:border-b-0",
+                  idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                )}
+              >
+                {/* Court info */}
+                <div className="w-48 shrink-0 p-4 border-r border-gray-200 flex flex-col justify-center bg-gradient-to-r from-[#0a4d8c]/5 to-transparent">
+                  <div className="font-semibold text-[#0a4d8c]">{court.firstName}</div>
+                  <div className="text-xs text-gray-500">{court.lastName}</div>
+                  {court.bio && (
+                    <div className="text-[10px] text-gray-400 mt-1 line-clamp-1">{court.bio}</div>
+                  )}
+                  <div className="text-[10px] text-[#0a4d8c] font-medium mt-1">
+                    {courtAppointments.length} reservas
                         </div>
                       </div>
                       
-                      <div className="text-right">
-                        <div className="flex items-center gap-2 mb-1">
-                          {dayData.occupancyPercentage >= 80 ? (
-                            <TrendingUp className="w-4 h-4 text-green-600" />
-                          ) : dayData.occupancyPercentage >= 50 ? (
-                            <TrendingUp className="w-4 h-4 text-yellow-600" />
-                          ) : (
-                            <TrendingDown className="w-4 h-4 text-orange-600" />
-                          )}
-                          <span className="text-2xl font-bold">
-                            {dayData.occupancyPercentage.toFixed(0)}%
+                {/* Timeline */}
+                <div className="flex-1 h-16 relative select-none bg-gradient-to-b from-[#0a4d8c]/10 to-[#0a4d8c]/5">
+                  {/* Grid lines */}
+                  <div className="absolute inset-0 flex">
+                    {hours.map((_, i) => (
+                      <div 
+                        key={i} 
+                        className="flex-1 border-r border-[#0a4d8c]/10 last:border-r-0"
+                      />
+                    ))}
+                    </div>
+                  
+                  {/* Línea central */}
+                  <div className="absolute top-1/2 left-0 right-0 h-px bg-[#0a4d8c]/5" />
+                  
+                  {/* Turnos como bloques */}
+                  {courtAppointments.map((apt) => {
+                    const { leftPercent, widthPercent, startTimeStr } = getAppointmentPosition(apt)
+                    const start = new Date(apt.startTime)
+                    const end = new Date(apt.endTime)
+                    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+                    const isLongDuration = durationMinutes >= 90
+                    
+                    // Formatear horas locales
+                    const startHour = start.getHours()
+                    const startMin = start.getMinutes()
+                    const endHour = end.getHours()
+                    const endMin = end.getMinutes()
+                    const startTimeFormatted = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`
+                    const endTimeFormatted = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`
+                    
+                    return (
+                      <div
+                        key={apt.id}
+                        onClick={() => setSelectedAppointment(apt)}
+                        className={cn(
+                          "absolute top-1 bottom-1 rounded-sm cursor-pointer transition-all hover:opacity-90 z-10 shadow-sm border-2",
+                          apt.status === AppointmentStatus.CONFIRMED 
+                            ? "bg-[#ccff00] text-[#0a4d8c] border-[#ccff00]" 
+                            : apt.status === AppointmentStatus.PENDING
+                            ? "bg-[#ccff00]/70 text-[#0a4d8c] border-[#ccff00]"
+                            : "bg-[#0a4d8c]/70 text-white border-[#0a4d8c]",
+                          isLongDuration && "ring-2 ring-amber-400/50"
+                        )}
+                        style={{
+                          left: `${leftPercent}%`,
+                          width: `${widthPercent}%`,
+                        }}
+                        title={`${apt.customer.firstName} ${apt.customer.lastName} - ${startTimeFormatted} a ${endTimeFormatted} (${durationMinutes} min)`}
+                      >
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-1">
+                          <span className="text-[10px] font-bold truncate w-full text-center">
+                            {apt.customer.firstName} {apt.customer.lastName.charAt(0)}.
                           </span>
-                        </div>
-                        <p className="text-xs text-gray-600">Ocupación del día</p>
-                        <Progress 
-                          value={dayData.occupancyPercentage} 
-                          className="mt-2 h-2"
-                        />
-                      </div>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="p-6">
-                    {/* Turnos programados - Versión compacta */}
-                    <div className="mb-6">
-                      <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        Turnos a Atender ({dayData.appointments.filter(a => a.status !== AppointmentStatus.CANCELLED).length})
-                      </h4>
-                      
-                      {dayData.appointments.filter(a => a.status !== AppointmentStatus.CANCELLED).length === 0 ? (
-                        <p className="text-sm text-gray-500 text-center py-4">
-                          No hay turnos programados para este profesional
-                        </p>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {dayData.appointments
-                            .filter(a => a.status !== AppointmentStatus.CANCELLED)
-                            .map((apt) => {
-                              const startTime = parseISO(apt.startTime)
-                              const endTime = parseISO(apt.endTime)
-                              
-                              return (
-                                <div
-                                  key={apt.id}
-                                  className={`p-2 rounded border transition-all hover:shadow-sm text-xs ${getStatusColor(apt.status)}`}
-                                  style={apt.status === AppointmentStatus.COMPLETED ? { backgroundColor: '#6E52FF20', borderColor: '#6E52FF40' } : undefined}
-                                >
-                                  <div className="flex items-center justify-between gap-1 mb-1">
-                                    <div className="flex items-center gap-1">
-                                      {getStatusIcon(apt.status)}
-                                      <span className="font-semibold text-xs">
-                                        {format(startTime, "HH:mm")}
-                                      </span>
-                                    </div>
-                                    {apt.status === AppointmentStatus.PENDING && (
-                                      <Button
-                                        size="sm"
-                                        variant="default"
-                                        onClick={() => handleQuickAction(apt.id, "confirm")}
-                                        className="h-5 px-2 text-[10px]"
-                                      >
-                                        ✓
-                                      </Button>
-                                    )}
-                                  </div>
-                                  <p className="font-medium text-gray-900 truncate text-xs">
-                                    {apt.customer.firstName} {apt.customer.lastName}
-                                  </p>
-                                  <p className="text-gray-600 truncate text-[10px]">{apt.service.name}</p>
-                                  {apt.service.price && (
-                                    <p className="text-[10px] font-semibold text-green-700 mt-0.5">
-                                      ${Number(apt.service.price).toLocaleString()}
-                                    </p>
-                                  )}
-                                  {apt.status !== AppointmentStatus.CANCELLED && apt.status !== AppointmentStatus.COMPLETED && apt.status !== AppointmentStatus.PENDING && (
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => handleQuickAction(apt.id, "cancel")}
-                                      className="h-5 px-2 text-[10px] mt-1 w-full"
-                                    >
-                                      Cancelar
-                                    </Button>
-                                  )}
-                                </div>
-                              )
-                            })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Slots libres para publicitar */}
-                    {dayData.freeSlots.length > 0 && (
-                      <div className="border-t pt-6">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                            <Share2 className="w-4 h-4" style={{ color: '#6E52FF' }} />
-                            Slots Libres para Publicitar ({dayData.freeSlots.length})
-                          </h4>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => copyFreeSlots(dayData.freeSlots, data.professional.fullName, currentDate)}
-                            className="gap-2"
-                          >
-                            <Copy className="w-3 h-3" />
-                            Copiar Horarios
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {dayData.freeSlots.slice(0, 20).map((slot, idx) => (
-                            <Badge
-                              key={idx}
-                              variant="outline"
-                              className="font-mono border" 
-                              style={{ backgroundColor: '#C7387020', color: '#C73870', borderColor: '#C7387040' }}
-                            >
-                              {slot.time}
-                            </Badge>
-                          ))}
-                          {dayData.freeSlots.length > 20 && (
-                            <Badge variant="secondary" className="font-mono">
-                              +{dayData.freeSlots.length - 20} más
-                            </Badge>
+                          <span className="text-[9px] opacity-80">
+                            {startTimeFormatted} - {endTimeFormatted}
+                          </span>
+                          {isLongDuration && (
+                            <span className="text-[8px] font-bold mt-0.5 opacity-90">
+                              {durationMinutes / 60}h
+                            </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-3">
-                          💡 Estos horarios están disponibles y puedes promocionarlos para llenar tu agenda
-                        </p>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    )
+                  })}
+                        </div>
+                      </div>
               )
             })}
         </div>
-      ) : (
-        // Vista semanal con porcentaje de ocupación
-        <div className="space-y-4">
-          {professionals?.filter(p => p.isActive).map(professional => {
-            // Calcular porcentaje de ocupación semanal
-            const weeklyData = dateRange.map(date => {
-              const dateKey = format(date, "yyyy-MM-dd")
-              const key = `${professional.id}-${dateKey}`
-              const slots = availabilityData[key] || []
-              const dayAppointments = appointmentsByProfessionalAndDay[professional.id]?.[dateKey] || []
-              const activeAppointments = dayAppointments.filter(
-                apt => apt.status !== AppointmentStatus.CANCELLED
-              )
-              
-              const occupiedSlots = activeAppointments.length
-              const totalSlots = slots.length
-              const occupancyPercentage = totalSlots > 0 ? (occupiedSlots / totalSlots) * 100 : 0
-              
-              return {
-                date,
-                dateKey,
-                dayAppointments,
-                activeAppointments,
-                slots,
-                occupiedSlots,
-                totalSlots,
-                occupancyPercentage,
-              }
-            })
 
-            const totalOccupied = weeklyData.reduce((sum, d) => sum + d.occupiedSlots, 0)
-            const totalSlots = weeklyData.reduce((sum, d) => sum + d.totalSlots, 0)
-            const weeklyOccupancyPercentage = totalSlots > 0 ? (totalOccupied / totalSlots) * 100 : 0
-
-            return (
-              <Card key={professional.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: '#6E52FF' }}>
-                        {professional.firstName[0]}{professional.lastName[0]}
+        {/* Footer */}
+        <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t border-gray-200">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Clock className="w-4 h-4 text-[#0a4d8c]" />
+            <span>Click en una reserva para ver detalles</span>
+          </div>
+          
+          <div className="flex items-center gap-5 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-4 rounded bg-[#ccff00]" />
+              <span className="text-gray-500">Confirmada</span>
                       </div>
-                      {professional.fullName}
-                    </CardTitle>
-                    <div className="text-right">
                       <div className="flex items-center gap-2">
-                        {weeklyOccupancyPercentage >= 80 ? (
-                          <TrendingUp className="w-4 h-4 text-green-600" />
-                        ) : weeklyOccupancyPercentage >= 50 ? (
-                          <TrendingUp className="w-4 h-4 text-yellow-600" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4 text-orange-600" />
-                        )}
-                        <span className="text-xl font-bold">
-                          {weeklyOccupancyPercentage.toFixed(0)}%
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-600">Ocupación semanal</p>
-                      <Progress 
-                        value={weeklyOccupancyPercentage} 
-                        className="mt-1 h-1.5 w-24"
-                      />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-7 gap-2">
-                    {weeklyData.map((dayData) => {
-                      const isCurrentDay = isToday(dayData.date)
+              <div className="w-5 h-4 rounded bg-[#ccff00]/70 border-2 border-[#ccff00]" />
+              <span className="text-gray-500">Pendiente</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-                      return (
-                        <div
-                          key={dayData.dateKey}
-                          className={`p-2 rounded border text-center ${
-                            isCurrentDay ? "ring-2 ring-blue-500" : ""
-                          }`}
-                        >
-                          <p className="text-xs font-medium mb-1">
-                            {format(dayData.date, "EEE", { locale: es })}
-                          </p>
-                          <p className="text-sm font-bold mb-1">{format(dayData.date, "d")}</p>
-                          <Badge variant="secondary" className="text-xs mb-1">
-                            {dayData.activeAppointments.length}
-                          </Badge>
-                          {dayData.totalSlots > 0 && (
-                            <div className="mt-1">
-                              <div className="text-[10px] text-gray-600">
-                                {dayData.occupancyPercentage.toFixed(0)}%
-                              </div>
-                              <Progress 
-                                value={dayData.occupancyPercentage} 
-                                className="h-1 mt-0.5"
-                              />
+      {/* Resumen */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="bg-white/95 border-white/20">
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold text-[#ccff00]">
+              {dayAppointments.filter(a => a.status === AppointmentStatus.CONFIRMED).length}
+            </p>
+            <p className="text-sm text-gray-600">Confirmadas</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/95 border-white/20">
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold text-[#ccff00]/70">
+              {dayAppointments.filter(a => a.status === AppointmentStatus.PENDING).length}
+            </p>
+            <p className="text-sm text-gray-600">Pendientes</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/95 border-white/20">
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold text-[#0a4d8c]">
+              {dayAppointments.filter(a => a.status === AppointmentStatus.COMPLETED).length}
+            </p>
+            <p className="text-sm text-gray-600">Completadas</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/95 border-white/20">
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold text-[#0a4d8c]">
+              {dayAppointments.length}
+            </p>
+            <p className="text-sm text-gray-600">Total Reservas</p>
+          </CardContent>
+        </Card>
+                      </div>
+
+      {/* Popup de detalles del cliente */}
+      {selectedAppointment && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md bg-white shadow-2xl">
+            <CardHeader className="bg-gradient-to-r from-[#0a4d8c] to-[#1a6fc2]">
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-white">Detalles de la Reserva</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setSelectedAppointment(null)}
+                  className="text-white/60 hover:text-white hover:bg-white/10"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+                    </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-gray-600 text-xs">Cliente</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <User className="w-4 h-4 text-[#0a4d8c]" />
+                    <p className="text-gray-900 font-semibold">
+                      {selectedAppointment.customer.firstName} {selectedAppointment.customer.lastName}
+                    </p>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label className="text-gray-600 text-xs">Email</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Mail className="w-4 h-4 text-[#0a4d8c]" />
+                    <a 
+                      href={`mailto:${selectedAppointment.customer.email}`}
+                      className="text-[#0a4d8c] hover:underline"
+                    >
+                      {selectedAppointment.customer.email}
+                    </a>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label className="text-gray-600 text-xs">Cancha</Label>
+                  <p className="text-gray-900 mt-1">{selectedAppointment.professional.fullName}</p>
+                </div>
+                
+                <div>
+                  <Label className="text-gray-600 text-xs">Duración</Label>
+                  <p className="text-gray-900 mt-1">{selectedAppointment.service.name}</p>
+                </div>
+                
+                <div>
+                  <Label className="text-gray-600 text-xs">Horario</Label>
+                  <p className="text-gray-900 mt-1">
+                    {(() => {
+                      const start = new Date(selectedAppointment.startTime)
+                      const end = new Date(selectedAppointment.endTime)
+                      const startHour = start.getHours()
+                      const startMin = start.getMinutes()
+                      const endHour = end.getHours()
+                      const endMin = end.getMinutes()
+                      return `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')} - ${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`
+                    })()}
+                  </p>
+                </div>
+                
+                <div>
+                  <Label className="text-gray-600 text-xs">Fecha</Label>
+                  <p className="text-gray-900 mt-1">
+                    {format(new Date(selectedAppointment.startTime), "EEEE d 'de' MMMM", { locale: es })}
+                  </p>
+                </div>
+                
+                {selectedAppointment.service.price && (
+                  <div>
+                    <Label className="text-gray-600 text-xs">Precio</Label>
+                    <p className="text-[#0a4d8c] font-bold text-lg mt-1">
+                      ${Number(selectedAppointment.service.price).toLocaleString()}
+                    </p>
                             </div>
                           )}
-                        </div>
-                      )
-                    })}
+                
+                <div>
+                  <Label className="text-gray-600 text-xs">Estado</Label>
+                  <div className="mt-1">
+                    {selectedAppointment.status === AppointmentStatus.CONFIRMED ? (
+                      <Badge className="bg-[#ccff00] text-[#0a4d8c]">Confirmado</Badge>
+                    ) : selectedAppointment.status === AppointmentStatus.PENDING ? (
+                      <Badge className="bg-[#ccff00]/70 text-[#0a4d8c] border-2 border-[#ccff00]">Pendiente</Badge>
+                    ) : (
+                      <Badge variant="secondary">Completado</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 pt-4 border-t border-gray-200">
+                {selectedAppointment.status === AppointmentStatus.PENDING && (
+                  <Button
+                    onClick={() => {
+                      handleQuickAction(selectedAppointment.id, "confirm")
+                      setSelectedAppointment(null)
+                    }}
+                    className="flex-1 bg-[#ccff00] hover:bg-[#d4ff33] text-[#0a4d8c] font-semibold"
+                  >
+                    Confirmar
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedAppointment(null)}
+                  className="flex-1 border-gray-300"
+                >
+                  Cerrar
+                </Button>
                   </div>
                 </CardContent>
               </Card>
-            )
-          })}
         </div>
       )}
-
-      {/* Resumen general */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold" style={{ color: '#6E52FF' }}>
-                {filteredAppointments.filter(a => a.status === AppointmentStatus.CONFIRMED).length}
-              </p>
-              <p className="text-sm text-gray-600">Confirmados</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-yellow-600">
-                {filteredAppointments.filter(a => a.status === AppointmentStatus.PENDING).length}
-              </p>
-              <p className="text-sm text-gray-600">Pendientes</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold" style={{ color: '#C73870' }}>
-                {filteredAppointments.filter(a => a.status === AppointmentStatus.COMPLETED).length}
-              </p>
-              <p className="text-sm text-gray-600">Completados</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-orange-600">
-                {professionalDayData.reduce((sum, d) => sum + d.freeSlots.length, 0)}
-              </p>
-              <p className="text-sm text-gray-600">Slots Libres</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

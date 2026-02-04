@@ -34,16 +34,16 @@ export function ClientInfoForm({ tenant, onSubmit, onBack }: ClientInfoFormProps
         onClick={onBack} 
         className="mb-4 gap-2"
         style={{
-          color: tenant?.primaryColor || '#3b82f6',
+          color: tenant?.primaryColor || '#22c55e',
         }}
       >
         <ArrowLeft className="w-4 h-4" />
         Volver
       </Button>
 
-      <h2 className="text-2xl font-bold mb-2">Tus Datos</h2>
+      <h2 className="text-2xl font-bold mb-2">👤 Tus Datos</h2>
       <p className="text-gray-600 mb-6">
-        Por favor completa tus datos para finalizar la reserva
+        Completa tus datos para confirmar la reserva de cancha
       </p>
 
       <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-6">
@@ -92,11 +92,11 @@ export function ClientInfoForm({ tenant, onSubmit, onBack }: ClientInfoFormProps
           className="w-full" 
           size="lg"
           style={{
-            backgroundColor: tenant?.primaryColor || '#3b82f6',
+            backgroundColor: tenant?.primaryColor || '#22c55e',
             color: 'white',
           }}
         >
-          Confirmar Turno
+          🎾 Confirmar Reserva
         </Button>
       </form>
     </div>

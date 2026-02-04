@@ -203,21 +203,21 @@ export function BookingConfirmation({
     const icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Turnero//Turnero//ES',
+      'PRODID:-//PadelTurn//PadelTurn//ES',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
       `DTSTART:${formatICSDate(startTime)}`,
       `DTEND:${formatICSDate(endTime)}`,
-      `SUMMARY:${service.name} - ${professional.fullName}`,
-      `DESCRIPTION:Turno con ${professional.fullName} para ${service.name}`,
+      `SUMMARY:🎾 Pádel - ${professional.fullName}`,
+      `DESCRIPTION:Turno de pádel en ${professional.fullName} (${service.name})`,
       `LOCATION:`,
       'STATUS:CONFIRMED',
       'SEQUENCE:0',
       'BEGIN:VALARM',
       'TRIGGER:-PT24H',
       'ACTION:DISPLAY',
-      'DESCRIPTION:Recordatorio de turno',
+      'DESCRIPTION:Recordatorio de turno de pádel',
       'END:VALARM',
       'END:VEVENT',
       'END:VCALENDAR',
@@ -273,10 +273,10 @@ export function BookingConfirmation({
       {/* Success Icon */}
       <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
-          <CheckCircle2 className="w-12 h-12 text-green-600" />
+          <span className="text-5xl">🎾</span>
         </div>
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">
-          ¡Turno Confirmado!
+        <h2 className="text-3xl font-bold text-green-600 mb-2">
+          ¡Cancha Reservada!
         </h2>
         <p className="text-gray-600">
           Hemos enviado un email de confirmación a {clientEmail}
@@ -284,11 +284,36 @@ export function BookingConfirmation({
       </div>
 
       {/* Booking Details Card */}
-      <Card className="mb-6">
+      <Card className="mb-6 border-green-200">
         <CardContent className="p-6 space-y-6">
-          {/* Servicio */}
+          {/* Cancha */}
+          <div className="border-b border-green-100 pb-6">
+            <h3 className="font-semibold text-gray-700 mb-3">🎾 Cancha Reservada</h3>
+            <div className="flex items-center gap-4">
+              <div 
+                className="w-20 h-20 rounded-lg bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center"
+                style={{
+                  backgroundImage: professional.photoUrl ? `url(${professional.photoUrl})` : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              >
+                {!professional.photoUrl && (
+                  <span className="text-3xl">🎾</span>
+                )}
+              </div>
+              <div>
+                <p className="font-bold text-xl">{professional.fullName}</p>
+                {professional.bio && (
+                  <p className="text-sm text-gray-600">{professional.bio}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Duración del turno */}
           <div>
-            <h3 className="font-semibold text-gray-700 mb-3">Servicio</h3>
+            <h3 className="font-semibold text-gray-700 mb-3">⏱️ Duración del Turno</h3>
             <div className="flex justify-between items-start">
               <div>
                 <p className="font-semibold text-lg">{service.name}</p>
@@ -298,29 +323,11 @@ export function BookingConfirmation({
               </div>
               <div className="text-right">
                 {service.price && (
-                  <p className="font-semibold text-lg">
+                  <p className="font-bold text-xl text-green-600">
                     ${Number(service.price).toLocaleString()}
                   </p>
                 )}
-                <p className="text-sm text-gray-600">{service.duration} min</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t pt-6">
-            <h3 className="font-semibold text-gray-700 mb-3">Profesional</h3>
-            <div className="flex items-center gap-3">
-              <Avatar className="w-16 h-16">
-                <AvatarImage src={professional.photoUrl || undefined} alt={professional.fullName} />
-                <AvatarFallback>
-                  {`${professional.firstName[0]}${professional.lastName[0]}`.toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-semibold">{professional.fullName}</p>
-                {professional.bio && (
-                  <p className="text-sm text-gray-600">{professional.bio}</p>
-                )}
+                <p className="text-sm text-gray-600">{service.duration} minutos</p>
               </div>
             </div>
           </div>
@@ -392,11 +399,11 @@ export function BookingConfirmation({
       </div>
 
       {/* Info adicional */}
-      <div className="mt-8 p-4 bg-blue-50 rounded-lg">
+      <div className="mt-8 p-4 bg-green-50 rounded-lg border border-green-200">
         <p className="text-sm text-gray-700">
-          <strong>Nota:</strong> Te enviaremos un recordatorio 24 horas antes de tu cita.
+          <strong>🎾 Importante:</strong> Te enviaremos un recordatorio 24 horas antes de tu turno.
           Si necesitas cancelar o reprogramar, por favor contáctanos con al menos
-          12 horas de anticipación.
+          12 horas de anticipación. ¡Nos vemos en la cancha!
         </p>
       </div>
     </div>

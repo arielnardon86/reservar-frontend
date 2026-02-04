@@ -1,4 +1,5 @@
 // Tipos TypeScript para las entidades del backend
+// Adaptado para sistema de reservas de canchas de pádel
 
 export interface Tenant {
   id: string;
@@ -50,17 +51,26 @@ export interface UpdateTenantDto {
   locale?: string;
 }
 
+/**
+ * Service representa un Tipo de Turno en el contexto de pádel.
+ * - name: Nombre del turno (ej: "Turno 1 hora", "Turno 90 minutos")
+ * - duration: Duración en minutos (60, 90, 120)
+ * - price: Precio del turno
+ */
 export interface Service {
   id: string;
   tenantId: string;
-  name: string;
+  name: string;        // Nombre del tipo de turno
   description?: string;
-  duration: number; // minutos
-  price?: number;
+  duration: number;    // Duración en minutos (60, 90, 120)
+  price?: number;      // Precio por turno
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
+
+// Alias semántico para tipos de turno de pádel
+export type TurnoDuration = Service;
 
 export interface CreateServiceDto {
   name: string;
@@ -78,20 +88,31 @@ export interface UpdateServiceDto {
   isActive?: boolean;
 }
 
+/**
+ * Professional representa una Cancha en el contexto de pádel.
+ * - firstName: Nombre de la cancha (ej: "Cancha 1", "Cancha Central")
+ * - lastName: Tipo de superficie (ej: "Cristal", "Hormigón", "Césped")
+ * - fullName: Nombre completo (ej: "Cancha 1 Cristal")
+ * - bio: Características (ej: "Techada, iluminación LED")
+ * - photoUrl: Imagen de la cancha
+ */
 export interface Professional {
   id: string;
   tenantId: string;
-  firstName: string;
-  lastName: string;
-  fullName: string;
+  firstName: string;   // Nombre de la cancha
+  lastName: string;    // Tipo de superficie
+  fullName: string;    // Nombre completo
   email?: string;
   phone?: string;
-  photoUrl?: string;
-  bio?: string;
+  photoUrl?: string;   // Imagen de la cancha
+  bio?: string;        // Características (techada, iluminación, etc.)
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
+
+// Alias semántico: Court = Cancha de pádel
+export type Court = Professional;
 
 export interface CreateProfessionalDto {
   firstName: string;
@@ -165,15 +186,21 @@ export interface CreateCustomerDto {
   notes?: string;
 }
 
+/**
+ * Appointment representa una Reserva de cancha de pádel.
+ * - service: Tipo de turno (duración)
+ * - professional: Cancha reservada
+ * - customer: Jugador que reservó
+ */
 export interface Appointment {
   id: string;
   tenantId: string;
   customerId: string;
-  customer: Customer;
+  customer: Customer;        // Jugador
   serviceId: string;
-  service: Service;
+  service: Service;          // Tipo de turno (duración)
   professionalId: string;
-  professional: Professional;
+  professional: Professional; // Cancha reservada
   startTime: string;
   endTime: string;
   status: AppointmentStatus;
@@ -188,6 +215,9 @@ export interface Appointment {
   createdAt: string;
   updatedAt: string;
 }
+
+// Alias semántico: Reserva de cancha
+export type CourtReservation = Appointment;
 
 export enum AppointmentStatus {
   PENDING = 'PENDING',

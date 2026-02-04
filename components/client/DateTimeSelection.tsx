@@ -145,14 +145,18 @@ export function DateTimeSelection({
         onClick={onBack} 
         className="mb-4 gap-2"
         style={{
-          color: tenant?.primaryColor || '#3b82f6',
+          color: tenant?.primaryColor || '#22c55e',
         }}
       >
         <ArrowLeft className="w-4 h-4" />
         Volver
       </Button>
 
-      <h2 className="text-2xl font-bold mb-6">Selecciona Fecha y Hora</h2>
+      <h2 className="text-2xl font-bold mb-2">📅 Selecciona Fecha y Hora</h2>
+      <p className="text-gray-600 mb-6">
+        Cancha: <span className="font-semibold">{professional.fullName}</span> • 
+        Duración: <span className="font-semibold">{service.duration} min</span>
+      </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Calendario */}
@@ -204,12 +208,12 @@ export function DateTimeSelection({
                   style={
                     selectedTime === time
                       ? {
-                          backgroundColor: tenant?.primaryColor || '#3b82f6',
+                          backgroundColor: tenant?.primaryColor || '#22c55e',
                           color: 'white',
-                          borderColor: tenant?.primaryColor || '#3b82f6',
+                          borderColor: tenant?.primaryColor || '#22c55e',
                         }
                       : {
-                          borderColor: tenant?.primaryColor ? `${tenant.primaryColor}40` : undefined,
+                          borderColor: tenant?.primaryColor ? `${tenant.primaryColor}40` : '#22c55e40',
                         }
                   }
                 >
@@ -228,11 +232,11 @@ export function DateTimeSelection({
           disabled={!selectedDate || !selectedTime}
           size="lg"
           style={{
-            backgroundColor: tenant?.primaryColor || '#3b82f6',
+            backgroundColor: tenant?.primaryColor || '#22c55e',
             color: 'white',
           }}
         >
-          Continuar
+          Continuar →
         </Button>
       </div>
     </div>

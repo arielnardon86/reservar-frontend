@@ -343,6 +343,16 @@ export const useAvailability = (tenantSlug: string | null, query: AvailabilityQu
   });
 };
 
+export const useDayAppointments = (tenantSlug: string | null, date: string | null) => {
+  return useQuery({
+    queryKey: ['appointmentsByDay', tenantSlug, date],
+    queryFn: () => appointmentsApi.getDayAppointments(tenantSlug!, date!),
+    enabled: !!tenantSlug && !!date,
+    staleTime: 0,
+    gcTime: 0,
+  });
+};
+
 // ============================================
 // AUTH
 // ============================================
