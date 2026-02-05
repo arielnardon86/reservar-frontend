@@ -6,14 +6,12 @@ import { AppointmentsCalendar } from "./AppointmentsCalendar"
 import { MetricsDashboard } from "./MetricsDashboard"
 import { AppointmentsManager } from "./AppointmentsManager"
 import { ServicesManager } from "./ServicesManager"
-import { ProfessionalsManager } from "./ProfessionalsManager"
 import { SettingsPanel } from "./SettingsPanel"
 import { SchedulesManager } from "./SchedulesManager"
 import { TenantProvider, useTenantContext } from "@/lib/context/TenantContext"
 import { useAuth } from "@/lib/context/AuthContext"
 import {
   Calendar,
-  Users,
   Settings,
   Clock,
   LogOut,
@@ -26,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/components/ui/utils"
 import Link from "next/link"
 
-type ViewType = "calendar" | "metrics" | "appointments" | "services" | "professionals" | "schedules" | "settings"
+type ViewType = "calendar" | "metrics" | "appointments" | "services" | "schedules" | "settings"
 
 function AdminDashboardContent() {
   const [activeView, setActiveView] = useState<ViewType>("calendar")
@@ -58,7 +56,6 @@ function AdminDashboardContent() {
     { id: "metrics" as ViewType, label: "Métricas", icon: BarChart3 },
     { id: "appointments" as ViewType, label: "Reservas", icon: Calendar },
     { id: "services" as ViewType, label: "Espacios", icon: Clock },
-    { id: "professionals" as ViewType, label: "Recursos", icon: Users },
     { id: "schedules" as ViewType, label: "Horarios", icon: Clock },
     { id: "settings" as ViewType, label: "Configuración", icon: Settings },
   ]
@@ -73,8 +70,6 @@ function AdminDashboardContent() {
         return <AppointmentsManager />
       case "services":
         return <ServicesManager />
-      case "professionals":
-        return <ProfessionalsManager />
       case "schedules":
         return <SchedulesManager />
       case "settings":

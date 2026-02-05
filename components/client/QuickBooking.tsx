@@ -599,10 +599,10 @@ export function QuickBooking() {
         </div>
       </div>
 
-      {/* Selector de fecha */}
+      {/* Selector de fecha - scroll horizontal en móvil */}
       <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-[81px] z-20">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 -mx-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
             <Button
               variant="ghost"
               size="icon"
@@ -619,7 +619,7 @@ export function QuickBooking() {
               <ChevronLeft className="w-5 h-5" />
             </Button>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               {days.map((day) => {
                 const isSelected = isSameDay(day, selectedDate)
                 const isToday = isSameDay(day, new Date())
@@ -632,7 +632,7 @@ export function QuickBooking() {
                       handleCloseSelection()
                     }}
                     className={cn(
-                      "flex flex-col items-center px-4 py-2 rounded-xl transition-all",
+                      "flex flex-col items-center px-3 sm:px-4 py-2 rounded-xl transition-all shrink-0 min-w-[56px]",
                       isSelected 
                         ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 font-bold" 
                         : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
@@ -676,19 +676,19 @@ export function QuickBooking() {
         </div>
       </div>
 
-      {/* Timeline Grid */}
-      <div className="max-w-6xl mx-auto px-6 py-8 relative z-10">
-        <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
-          {/* Header con horas */}
-          <div className="flex border-b border-slate-700 bg-slate-800">
-            <div className="w-48 shrink-0 p-4 border-r border-slate-700">
+      {/* Timeline Grid - scroll horizontal en móvil para ver todos los horarios */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10">
+        <p className="text-sm text-slate-400 mb-2 md:hidden text-center">Deslizá a la derecha para ver más horarios</p>
+        <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl overflow-x-auto">
+          <div className="flex border-b border-slate-700 bg-slate-800 min-w-[min(100%,800px)] sm:min-w-0">
+            <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700">
               <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Espacios</span>
             </div>
-            <div className="flex-1 flex">
+            <div className="flex flex-1" style={{ minWidth: `${hours.length * 48}px` }}>
               {hours.map((h) => (
                 <div 
                   key={h}
-                  className="flex-1 p-3 text-center text-sm font-medium text-slate-400 border-r border-slate-700 last:border-r-0"
+                  className="flex-1 min-w-[48px] p-2 sm:p-3 text-center text-xs sm:text-sm font-medium text-slate-400 border-r border-slate-700 last:border-r-0"
                 >
                   {h}
                 </div>
@@ -715,15 +715,16 @@ export function QuickBooking() {
                     idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
                   )}
                 >
-                  <div className="w-48 shrink-0 p-4 border-r border-slate-700 flex flex-col justify-center bg-slate-800/50">
-                    <div className="font-semibold text-emerald-400">{space.name}</div>
+                  <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 flex flex-col justify-center bg-slate-800/50">
+                    <div className="font-semibold text-emerald-400 text-sm sm:text-base">{space.name}</div>
                     {space.description && (
-                      <div className="text-xs text-slate-400 mt-1 line-clamp-2" title={space.description}>{space.description}</div>
+                      <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 line-clamp-2" title={space.description}>{space.description}</div>
                     )}
-                    <div className="text-xs text-slate-500 mt-0.5">{space.duration} min</div>
+                    <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5">{space.duration} min</div>
                   </div>
                   <div
-                    className="flex-1 h-16 relative cursor-pointer select-none bg-gradient-to-b from-slate-800/50 to-slate-800/30"
+                    className="flex-1 h-14 sm:h-16 min-w-[min(100%,800px)] sm:min-w-0 relative cursor-pointer select-none bg-gradient-to-b from-slate-800/50 to-slate-800/30"
+                    style={{ minWidth: `${hours.length * 48}px` }}
                     onClick={(e) => handleTimelineClick(space, e)}
                     onMouseMove={(e) => handleTimelineMouseMove(space, e)}
                     onMouseLeave={handleTimelineMouseLeave}

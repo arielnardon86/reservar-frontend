@@ -16,13 +16,11 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import type { CreateServiceDto, UpdateServiceDto } from "@/lib/api/types"
 
-// Duraciones típicas para espacios comunes (SUM, Gimnasio, Parrilla, etc.)
-const SPACE_DURATIONS = [
-  { value: 60, label: '1 hora' },
-  { value: 90, label: '1:30 hs' },
-  { value: 120, label: '2 horas' },
-  { value: 180, label: '3 horas' },
-]
+// Duraciones de 1 a 24 horas (en minutos)
+const SPACE_DURATIONS = Array.from({ length: 24 }, (_, i) => {
+  const hours = i + 1
+  return { value: hours * 60, label: hours === 1 ? '1 hora' : `${hours} horas` }
+})
 
 export function ServicesManager() {
   const { data: services, isLoading } = useServices()
@@ -168,16 +166,17 @@ export function ServicesManager() {
                 ))}
               </div>
               <div className="mt-2 flex items-center gap-2">
-                <span className="text-sm text-slate-500">Personalizada:</span>
+                <span className="text-sm text-slate-500">Personalizada (min):</span>
                 <Input
                   type="number"
                   value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) || 60 })}
+                  onChange={(e) => setFormData({ ...formData, duration: Math.min(1440, Math.max(15, parseInt(e.target.value) || 60)) })}
                   className="w-24 bg-slate-800 border-slate-700 text-white"
                   min={15}
+                  max={1440}
                   step={15}
                 />
-                <span className="text-sm text-slate-500">minutos</span>
+                <span className="text-sm text-slate-500">(máx. 24h)</span>
               </div>
             </div>
             <div>
@@ -351,11 +350,13 @@ export function ServicesManager() {
                 <Input
                   type="number"
                   value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) || 60 })}
+                  onChange={(e) => setFormData({ ...formData, duration: Math.min(1440, Math.max(15, parseInt(e.target.value) || 60)) })}
                   className="mt-2 w-32 bg-slate-800 border-slate-700 text-white"
                   min={15}
+                  max={1440}
                   step={15}
                 />
+                <span className="text-xs text-slate-500">min (máx. 1440 = 24h)</span>
               </div>
               <div>
                 <Label className="text-slate-300">Precio ($)</Label>

@@ -45,16 +45,36 @@ export function SchedulesManager() {
     endTime: "23:00",
     isException: false,
   })
+  const [turnos, setTurnos] = useState<{ start: string; end: string }[]>([{ start: "08:00", end: "23:00" }])
+
+  const addTurno = () => {
+    if (turnos.length >= 2) return
+    setTurnos([...turnos, { start: "14:00", end: "19:00" }])
+  }
+  const removeTurno = (index: number) => {
+    if (turnos.length <= 1) return
+    setTurnos(turnos.filter((_, i) => i !== index))
+  }
+  const updateTurno = (index: number, field: 'start' | 'end', value: string) => {
+    setTurnos(turnos.map((t, i) => i === index ? { ...t, [field]: value } : t))
+  }
 
   const handleCreate = async () => {
-    if (!formData.startTime || !formData.endTime) {
-      toast.error('Hora de inicio y fin son requeridas')
+    const valid = turnos.every(t => t.start && t.end)
+    if (!valid) {
+      toast.error('Cada turno debe tener hora de inicio y fin')
       return
     }
 
     try {
-      await createSchedule.mutateAsync(formData)
-      toast.success('Horario creado')
+      for (const turno of turnos) {
+        await createSchedule.mutateAsync({
+          ...formData,
+          startTime: turno.start,
+          endTime: turno.end,
+        })
+      }
+      toast.success(turnos.length > 1 ? `Se crearon ${turnos.length} horarios` : 'Horario creado')
       setFormData({
         serviceId: undefined,
         professionalId: undefined,
@@ -63,6 +83,7 @@ export function SchedulesManager() {
         endTime: "23:00",
         isException: false,
       })
+      setTurnos([{ start: "08:00", end: "23:00" }])
       setIsCreating(false)
     } catch (error: any) {
       toast.error(error?.message || 'Error al crear horario')
@@ -177,25 +198,37 @@ export function SchedulesManager() {
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-slate-300">Apertura *</Label>
-                <Input
-                  type="time"
-                  value={formData.startTime}
-                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="mt-2 bg-slate-800 border-slate-700 text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300">Cierre *</Label>
-                <Input
-                  type="time"
-                  value={formData.endTime}
-                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="mt-2 bg-slate-800 border-slate-700 text-white"
-                />
-              </div>
+            <div className="space-y-3">
+              <Label className="text-slate-300">Turnos (hasta 2 por día, formato 24h)</Label>
+              {turnos.map((turno, idx) => (
+                <div key={idx} className="flex items-center gap-2 p-2 bg-slate-800/50 rounded-lg">
+                  <span className="text-xs text-slate-500 w-16">{turnos.length > 1 ? `Turno ${idx + 1}` : 'Horario'}</span>
+                  <Input
+                    type="time"
+                    value={turno.start}
+                    onChange={(e) => updateTurno(idx, 'start', e.target.value)}
+                    className="flex-1 bg-slate-800 border-slate-700 text-white h-9"
+                  />
+                  <span className="text-slate-500">a</span>
+                  <Input
+                    type="time"
+                    value={turno.end}
+                    onChange={(e) => updateTurno(idx, 'end', e.target.value)}
+                    className="flex-1 bg-slate-800 border-slate-700 text-white h-9"
+                  />
+                  {turnos.length > 1 && (
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:bg-red-500/20" onClick={() => removeTurno(idx)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {turnos.length < 2 && (
+                <Button type="button" variant="outline" size="sm" onClick={addTurno} className="border-slate-700 text-slate-300">
+                  <Plus className="w-4 h-4 mr-1" />
+                  Agregar otro turno
+                </Button>
+              )}
             </div>
             <div className="flex gap-2">
               <Button 
@@ -387,6 +420,7 @@ export function SchedulesManager() {
                   />
                 </div>
               </div>
+              <p className="text-xs text-slate-500">Para agregar más turnos al mismo día y espacio, guardá y luego creá un nuevo horario con el mismo día y espacio.</p>
               <div className="flex gap-2">
                 <Button
                   onClick={() => handleUpdate(editingId, formData)}

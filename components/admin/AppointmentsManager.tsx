@@ -43,6 +43,7 @@ export function AppointmentsManager() {
   const updateAppointment = useUpdateAppointment()
   const deleteAppointment = useDeleteAppointment()
   const [searchTerm, setSearchTerm] = useState("")
+  const [filterDate, setFilterDate] = useState<string | null>(null)
 
   const getStatusBadge = (status: AppointmentStatus) => {
     const variants = {
@@ -133,6 +134,10 @@ export function AppointmentsManager() {
   const uniqueAppointments = Array.from(appointmentsMap.values())
 
   const filteredAppointments = uniqueAppointments.filter((appointment) => {
+    if (filterDate) {
+      const aptDate = format(new Date(appointment.startTime), 'yyyy-MM-dd')
+      if (aptDate !== filterDate) return false
+    }
     if (!searchTerm) return true
     const search = searchTerm.toLowerCase()
     return (
@@ -159,49 +164,68 @@ export function AppointmentsManager() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Gestión de reservas</h2>
-          <p className="text-gray-600">Administra todos los turnos agendados</p>
+          <h2 className="text-2xl font-bold text-white">Gestión de reservas</h2>
+          <p className="text-slate-400">Administra todos los turnos agendados</p>
         </div>
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="bg-slate-900/50 border-slate-800">
         <CardContent className="pt-6">
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Buscar por cliente, servicio, profesional..."
+                placeholder="Buscar por cliente, email, espacio, depto..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-slate-800 border-slate-700 text-white"
               />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="text-sm text-slate-400 whitespace-nowrap">Ver por día:</label>
+              <Input
+                type="date"
+                value={filterDate || ''}
+                onChange={(e) => setFilterDate(e.target.value || null)}
+                className="w-40 bg-slate-800 border-slate-700 text-white"
+              />
+              {filterDate && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFilterDate(null)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  Ver todos
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Appointments Table */}
-      <Card>
+      <Card className="bg-slate-900/50 border-slate-800">
         <CardHeader>
-          <CardTitle>Reservas ({filteredAppointments.length})</CardTitle>
+          <CardTitle className="text-white">Reservas ({filteredAppointments.length}){filterDate ? ` · ${format(new Date(filterDate), "d 'de' MMMM", { locale: es })}` : ''}</CardTitle>
         </CardHeader>
         <CardContent>
           {filteredAppointments.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              {searchTerm ? 'No se encontraron turnos' : 'No hay turnos agendados aún'}
+            <div className="text-center py-12 text-slate-500">
+              {filterDate ? `No hay reservas el ${format(new Date(filterDate), "d 'de' MMMM", { locale: es })}` : searchTerm ? 'No se encontraron turnos' : 'No hay turnos agendados aún'}
             </div>
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead>Depto / Piso</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Hora</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead></TableHead>
+                <TableRow className="border-slate-700 hover:bg-transparent">
+                  <TableHead className="text-slate-400">Cliente</TableHead>
+                  <TableHead className="text-slate-400">Servicio</TableHead>
+                  <TableHead className="text-slate-400">Depto / Piso</TableHead>
+                  <TableHead className="text-slate-400">Fecha</TableHead>
+                  <TableHead className="text-slate-400">Hora</TableHead>
+                  <TableHead className="text-slate-400">Estado</TableHead>
+                  <TableHead className="text-slate-400 w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -210,7 +234,7 @@ export function AppointmentsManager() {
                   const endDate = new Date(appointment.endTime)
                   
                   return (
-                    <TableRow key={appointment.id}>
+                    <TableRow key={appointment.id} className="border-slate-800 text-slate-200">
                       <TableCell className="font-medium">
                         <div>{appointment.customer.firstName} {appointment.customer.lastName}</div>
                         <div className="text-xs text-slate-500">{appointment.customer.email}</div>

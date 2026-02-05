@@ -299,17 +299,20 @@ export function SettingsPanel() {
                         Formatos: JPG, PNG, GIF. Tamaño máximo: 5MB
                       </p>
                       {/* Opción alternativa: URL */}
-                      <div className="mt-2 pt-2 border-t">
-                        <p className="text-xs text-gray-500 mb-1">O pega una URL:</p>
+                      <div className="mt-2 pt-2 border-t border-slate-700">
+                        <p className="text-xs text-slate-500 mb-1">O pega una URL de imagen:</p>
                         <Input
                           placeholder="https://ejemplo.com/logo.png"
                           value={formData.logoUrl?.startsWith('http') ? formData.logoUrl : ''}
                           onChange={(e) => {
-                            if (e.target.value.startsWith('http') || e.target.value === '') {
-                              setFormData({ ...formData, logoUrl: e.target.value })
+                            const v = e.target.value
+                            if (v.startsWith('http')) {
+                              setFormData({ ...formData, logoUrl: v })
+                            } else if (v === '' && formData.logoUrl?.startsWith('http')) {
+                              setFormData({ ...formData, logoUrl: '' })
                             }
                           }}
-                          className="text-xs"
+                          className="text-xs bg-slate-800 border-slate-700 text-white"
                         />
                       </div>
                     </div>
