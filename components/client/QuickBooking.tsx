@@ -21,7 +21,6 @@ import {
   MapPin,
   User,
   Mail,
-  Info
 } from "lucide-react"
 import { useServices, useDayAppointments } from "@/lib/api/hooks"
 import { useTenantContext } from "@/lib/context/TenantContext"
@@ -91,8 +90,9 @@ const addMinutesToTime = (time: string, minutes: number): string => {
   const [h, m] = time.split(':').map(Number)
   const total = h * 60 + m + minutes
   const newH = Math.floor(total / 60)
-  const newM = total % 60
-  return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`
+  const newM = (total % 60 + 60) % 60
+  const hCap = Math.max(0, Math.min(23, newH))
+  return `${String(hCap).padStart(2, '0')}:${String(newM).padStart(2, '0')}`
 }
 
 export function QuickBooking() {
@@ -112,12 +112,6 @@ export function QuickBooking() {
     startSlot: number
     space: Service
   } | null>(null)
-  const [hoveredDuration, setHoveredDuration] = useState<number | null>(null)
-  const [hoveredSlot, setHoveredSlot] = useState<{
-    spaceId: string
-    slot: number
-  } | null>(null)
-  
   const [selectedSlot, setSelectedSlot] = useState<BookingSelection | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [bookingForm, setBookingForm] = useState({ name: "", lastName: "", email: "", departamento: "", piso: "" })
@@ -184,23 +178,6 @@ export function QuickBooking() {
     loadAllAvailability()
   }, [activeSpaces, selectedDate, tenantSlug])
 
-  const isHourAvailable = (spaceId: string, hour: number): boolean => {
-    // El backend solo devuelve slots dentro de los horarios abiertos (schedules).
-    // Si una hora no está en el mapa, está fuera de horario → no disponible (gris).
-    const timeLocal = `${hour.toString().padStart(2, '0')}:00`
-    const offsetMinutes = new Date().getTimezoneOffset()
-    const offsetHours = offsetMinutes / 60
-    const hourUTC = hour + offsetHours
-    const hourUTCNormalized = ((hourUTC % 24) + 24) % 24
-    const timeUTC = `${hourUTCNormalized.toString().padStart(2, '0')}:00`
-    let available = availabilityMap.get(`${spaceId}-${timeUTC}`)
-    if (available === undefined) {
-      available = availabilityMap.get(`${spaceId}-${timeLocal}`)
-    }
-    // Solo disponible si el backend lo marcó explícitamente como true (dentro de horario y libre)
-    return available === true
-  }
-
   const isSlotInPast = (slotIndex: number): boolean => {
     if (!isSameDay(selectedDate, new Date())) return false
     const time = slotToTime(slotIndex)
@@ -229,20 +206,63 @@ export function QuickBooking() {
     return availabilityMap.get(`${spaceId}-${timeLocal}`) === true
   }
 
-  const isSlotAvailable = (spaceId: string, slotIndex: number): boolean => {
-    const timeStr = slotToTime(slotIndex)
-    return isSlotTimeInMapAvailable(spaceId, timeStr) && !isSlotInPast(slotIndex)
+  // Bloques disponibles: misma duración que el espacio, alineados desde la apertura, sin superponer reservas
+  const getAvailableBlocks = (space: Service): OccupiedBlock[] => {
+    const durationSlots = Math.floor(space.duration / SLOT_DURATION)
+    if (durationSlots < 1 || durationSlots > TOTAL_SLOTS) return []
+    const reserved = getOccupiedBlocks(space.id)
+    let openingSlot: number | null = null
+    for (let s = 0; s < TOTAL_SLOTS; s++) {
+      if (isSlotInPast(s)) continue
+      const timeStr = slotToTime(s)
+      if (isSlotTimeInMapAvailable(space.id, timeStr)) {
+        openingSlot = s
+        break
+      }
+    }
+    if (openingSlot == null) return []
+    const blocks: OccupiedBlock[] = []
+    for (let k = 0; ; k++) {
+      const startSlot = openingSlot + k * durationSlots
+      const endSlot = startSlot + durationSlots
+      if (endSlot > TOTAL_SLOTS) break
+      const anyPast = Array.from({ length: durationSlots }, (_, i) => startSlot + i).some(isSlotInPast)
+      if (anyPast) continue
+      const allInSchedule = Array.from({ length: durationSlots }, (_, i) => slotToTime(startSlot + i)).every(
+        t => isSlotTimeInMapAvailable(space.id, t)
+      )
+      if (!allInSchedule) continue
+      const overlaps = reserved.some(
+        r => !(endSlot <= r.startSlot || startSlot >= r.endSlot)
+      )
+      if (overlaps) continue
+      blocks.push({ startSlot, endSlot })
+    }
+    return blocks
   }
 
   type SlotStatus = 'available' | 'reserved' | 'unavailable'
-  const getSlotStatus = (spaceId: string, slotIndex: number): SlotStatus => {
-    const blocks = getOccupiedBlocks(spaceId)
-    const inBlock = blocks.some(b => slotIndex >= b.startSlot && slotIndex < b.endSlot)
-    if (inBlock) return 'reserved'
-    if (isSlotInPast(slotIndex)) return 'unavailable'
-    const timeStr = slotToTime(slotIndex)
-    if (!isSlotTimeInMapAvailable(spaceId, timeStr)) return 'unavailable'
-    return 'available'
+  const getSlotStatus = (space: Service, slotIndex: number): SlotStatus => {
+    const reserved = getOccupiedBlocks(space.id)
+    if (reserved.some(b => slotIndex >= b.startSlot && slotIndex < b.endSlot)) return 'reserved'
+    const availableBlocks = getAvailableBlocksCached(space)
+    if (availableBlocks.some(b => slotIndex >= b.startSlot && slotIndex < b.endSlot)) return 'available'
+    return 'unavailable'
+  }
+
+  const availableBlocksBySpaceId = useMemo(() => {
+    const map: Record<string, OccupiedBlock[]> = {}
+    activeSpaces.forEach(space => {
+      map[space.id] = getAvailableBlocks(space)
+    })
+    return map
+  }, [activeSpaces, selectedDate, availabilityMap, dayAppointments])
+
+  const getAvailableBlocksCached = (space: Service) => availableBlocksBySpaceId[space.id] ?? []
+
+  const getAvailableBlockAtSlot = (space: Service, slotIndex: number): OccupiedBlock | null => {
+    const blocks = getAvailableBlocksCached(space)
+    return blocks.find(b => slotIndex >= b.startSlot && slotIndex < b.endSlot) ?? null
   }
 
   const getOccupiedBlocks = (spaceId: string): OccupiedBlock[] => {
@@ -301,145 +321,18 @@ export function QuickBooking() {
     return blocks.sort((a, b) => a.startSlot - b.startSlot)
   }
 
-  const isDurationAvailable = (spaceId: string, startSlot: number, durationMinutes: number): boolean => {
-    const slotsNeeded = durationMinutes / SLOT_DURATION
-    const endSlot = startSlot + slotsNeeded
-    
-    if (endSlot > TOTAL_SLOTS) return false
-    
-    const startTime = slotToTime(startSlot)
-    const [startH, startM] = startTime.split(':').map(Number)
-    const startMinutes = startH * 60 + startM
-    const endMinutes = startMinutes + durationMinutes
-    const endTime = addMinutesToTime(startTime, durationMinutes)
-    const [endH, endM] = endTime.split(':').map(Number)
-    
-    // Verificar que todos los slots necesarios no estén en el pasado
-    for (let s = startSlot; s < endSlot; s++) {
-      if (isSlotInPast(s)) return false
-    }
-    
-    const appointments = dayAppointments[spaceId] || []
-    const startDate = new Date(selectedDate)
-    startDate.setHours(startH, startM, 0, 0)
-    const endDate = new Date(startDate)
-    endDate.setMinutes(endDate.getMinutes() + durationMinutes)
-    
-    const hasConflict = appointments.some(apt => {
-      const aptStart = new Date(apt.startTime)
-      const aptEnd = new Date(apt.endTime)
-      return (
-        (startDate >= aptStart && startDate < aptEnd) ||
-        (endDate > aptStart && endDate <= aptEnd) ||
-        (startDate <= aptStart && endDate >= aptEnd)
-      )
-    })
-    
-    if (hasConflict) return false
-    
-    // Verificar que todas las horas necesarias estén disponibles (excepto la hora de finalización)
-    // Si el turno termina a las 23:00, necesitamos que las horas 21 y 22 estén disponibles
-    for (let m = startMinutes; m < endMinutes; m += 60) {
-      const h = Math.floor(m / 60)
-      if (h < endH && !isHourAvailable(spaceId, h)) return false
-    }
-    
-    // Verificar que el turno no exceda el horario de cierre
-    // Buscar la última hora disponible en el mapa del backend (en UTC)
-    const offsetMinutes = new Date().getTimezoneOffset()
-    const offsetHours = offsetMinutes / 60
-    
-    let lastAvailableHourUTC = -1
-    // Buscar en el mapa directamente las horas UTC disponibles
-    for (let hUTC = 0; hUTC < 24; hUTC++) {
-      const timeUTC = `${hUTC.toString().padStart(2, '0')}:00`
-      const available = availabilityMap.get(`${spaceId}-${timeUTC}`)
-      if (available === true) {
-        lastAvailableHourUTC = Math.max(lastAvailableHourUTC, hUTC)
-      }
-    }
-    
-    // Si no encontramos ninguna hora disponible en el mapa, buscar la última hora que tiene algún valor (true o false)
-    // Esto nos da el horario de cierre real del backend
-    if (lastAvailableHourUTC < 0) {
-      for (let hUTC = 23; hUTC >= 0; hUTC--) {
-        const timeUTC = `${hUTC.toString().padStart(2, '0')}:00`
-        const available = availabilityMap.get(`${spaceId}-${timeUTC}`)
-        if (available !== undefined) {
-          // Si está marcado como false, significa que el backend generó el slot pero no está disponible
-          // Esto indica que el horario de cierre es antes de esta hora
-          // Si está marcado como true, esa es la última hora disponible
-          if (available === true) {
-            lastAvailableHourUTC = hUTC
-            break
-          } else {
-            // Si está false, el horario de cierre es antes, así que la última hora disponible es la anterior
-            lastAvailableHourUTC = hUTC - 1
-            break
-          }
-        }
-      }
-    }
-    
-    // Si todavía no encontramos, usar HOUR_END - 1 como fallback (pero esto no debería pasar)
-    if (lastAvailableHourUTC < 0) {
-      lastAvailableHourUTC = HOUR_END - 1
-    }
-    
-    // Convertir hora de finalización local a UTC
-    const endHUTC = ((endH + offsetHours) % 24 + 24) % 24
-    
-    // El turno no puede terminar después de la última hora disponible en UTC
-    if (endHUTC > lastAvailableHourUTC + 1) return false
-    
-    // Si termina exactamente en la hora de cierre (lastAvailableHourUTC + 1), solo permitir si termina a las XX:00
-    if (endHUTC === lastAvailableHourUTC + 1) {
-      if (endM !== 0) return false
-      return true
-    }
-    
-    // Si termina antes o en la última hora disponible, verificar que esa hora esté disponible
-    if (endHUTC <= lastAvailableHourUTC) {
-      // Verificar que la hora de finalización esté disponible en el mapa (si está en el mapa)
-      const endTimeUTC = `${endHUTC.toString().padStart(2, '0')}:00`
-      const endHourAvailable = availabilityMap.get(`${spaceId}-${endTimeUTC}`)
-      // Si está explícitamente marcado como false, no está disponible
-      if (endHourAvailable === false) return false
-      // Si no está en el mapa o está true, está disponible
-    }
-    
-    return true
-  }
-
   const getDurationOptions = (space: Service, startSlot: number): DurationOption[] => {
-    const startTime = slotToTime(startSlot)
-    const available = isDurationAvailable(space.id, startSlot, space.duration)
-    const endTime = addMinutesToTime(startTime, space.duration)
+    const block = getAvailableBlocksCached(space).find(b => b.startSlot === startSlot)
+    if (!block) return []
+    const endTime = slotToTime(block.endSlot)
+    const label = space.duration === 60 ? "1 hora" : space.duration === 90 ? "1h 30m" : `${space.duration / 60} horas`
     return [{
       minutes: space.duration,
-      label: space.duration === 60 ? "1 hora" : space.duration === 90 ? "1h 30m" : `${space.duration / 60} horas`,
+      label,
       endTime,
-      available,
-      service: available ? space : null
+      available: true,
+      service: space
     }]
-  }
-
-  const handleTimelineMouseMove = (space: Service, e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const percent = (x / rect.width) * 100
-    const rawSlot = (percent / 100) * TOTAL_SLOTS
-    const slot = Math.floor(rawSlot)
-    
-    if (slot >= 0 && slot < TOTAL_SLOTS && isSlotAvailable(space.id, slot)) {
-      setHoveredSlot({ spaceId: space.id, slot })
-    } else {
-      setHoveredSlot(null)
-    }
-  }
-
-  const handleTimelineMouseLeave = () => {
-    setHoveredSlot(null)
   }
 
   const handleTimelineClick = (space: Service, e: React.MouseEvent<HTMLDivElement>) => {
@@ -450,14 +343,13 @@ export function QuickBooking() {
     const rawSlot = (percent / 100) * TOTAL_SLOTS
     const slot = Math.floor(rawSlot)
     if (slot < 0 || slot >= TOTAL_SLOTS) return
-    if (!isSlotAvailable(space.id, slot)) return
-    if (activeSelection?.spaceId === space.id && activeSelection?.startSlot === slot) {
+    const block = getAvailableBlockAtSlot(space, slot)
+    if (!block) return
+    if (activeSelection?.spaceId === space.id && activeSelection?.startSlot === block.startSlot) {
       setActiveSelection(null)
-      setHoveredDuration(null)
       return
     }
-    setActiveSelection({ spaceId: space.id, startSlot: slot, space })
-    setHoveredDuration(null)
+    setActiveSelection({ spaceId: space.id, startSlot: block.startSlot, space })
   }
 
   const handleSelectDuration = (option: DurationOption) => {
@@ -471,14 +363,10 @@ export function QuickBooking() {
       duration: option.minutes,
     })
     setActiveSelection(null)
-    setHoveredDuration(null)
     setShowModal(true)
   }
 
-  const handleCloseSelection = () => {
-    setActiveSelection(null)
-    setHoveredDuration(null)
-  }
+  const handleCloseSelection = () => setActiveSelection(null)
 
   const handleConfirmBooking = async () => {
     if (!selectedSlot || !bookingForm.name || !bookingForm.lastName || !bookingForm.email || !bookingForm.departamento || !bookingForm.piso) {
@@ -524,13 +412,21 @@ export function QuickBooking() {
       setBookingSuccess(true)
       toast.success("¡Reserva confirmada!")
       
-      // Actualizar mapa local de disponibilidad
-      const startH = parseInt(selectedSlot.startTime.split(':')[0])
-      const endH = parseInt(selectedSlot.endTime.split(':')[0])
+      // Marcar como no disponibles los slots reservados (claves en UTC como devuelve el backend)
       setAvailabilityMap(prev => {
         const newMap = new Map(prev)
-        for (let h = startH; h < endH; h++) {
-          newMap.set(`${selectedSlot.space.id}-${h.toString().padStart(2, '0')}:00`, false)
+        const spaceId = selectedSlot.space.id
+        const [startH, startM] = selectedSlot.startTime.split(':').map(Number)
+        const [endH, endM] = selectedSlot.endTime.split(':').map(Number)
+        const startMins = startH * 60 + startM
+        const endMins = endH * 60 + endM
+        for (let min = startMins; min < endMins; min += SLOT_DURATION) {
+          const h = Math.floor(min / 60) % 24
+          const m = min % 60
+          const d = new Date(selectedSlot.date)
+          d.setHours(h, m, 0, 0)
+          const utc = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+          newMap.set(`${spaceId}-${utc}`, false)
         }
         return newMap
       })
@@ -683,7 +579,6 @@ export function QuickBooking() {
 
       {/* Timeline - scroll horizontal en móvil para ver todos los horarios */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10">
-        <p className="text-sm text-slate-400 mb-2 md:hidden text-center">Deslizá para ver más horarios</p>
         <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl overflow-x-auto">
           <div className="flex border-b border-slate-700 bg-slate-800 min-w-[min(100%,800px)] sm:min-w-0">
             <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700">
@@ -701,43 +596,38 @@ export function QuickBooking() {
             </div>
           </div>
 
-          {/* Courts */}
           <div className="relative">
             {loadingAvailability && (
-              <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-20">
+              <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-20">
                 <div className="w-8 h-8 border-3 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
               </div>
             )}
             
-            {activeSpaces.map((space, idx) => {
+            {activeSpaces.map((space) => {
               const occupiedBlocks = getOccupiedBlocks(space.id)
               const isActive = activeSelection?.spaceId === space.id
+              const selectedBlock = isActive && activeSelection ? getAvailableBlocksCached(space).find(b => b.startSlot === activeSelection.startSlot) : null
               return (
                 <div
                   key={space.id}
-                  className={cn(
-                    "flex border-b border-gray-100 last:border-b-0",
-                    idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                  )}
+                  className="flex border-b border-slate-700 last:border-b-0 bg-slate-800/60"
                 >
-                  <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 flex flex-col justify-center bg-slate-800/50">
-                    <div className="font-semibold text-emerald-400 text-sm sm:text-base">{space.name}</div>
+                  <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 flex flex-col justify-center bg-slate-800">
+                    <div className="font-semibold text-white text-sm sm:text-base">{space.name}</div>
                     {space.description && (
-                      <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 line-clamp-2" title={space.description}>{space.description}</div>
+                      <div className="text-[10px] sm:text-xs text-slate-300 mt-0.5 line-clamp-2" title={space.description}>{space.description}</div>
                     )}
-                    <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5">{space.duration} min</div>
+                    <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{space.duration} min</div>
                   </div>
                   <div
                     className="flex-1 h-14 sm:h-16 min-w-[min(100%,800px)] sm:min-w-0 relative cursor-pointer select-none"
                     style={{ minWidth: `${hours.length * 48}px` }}
                     onClick={(e) => handleTimelineClick(space, e)}
-                    onMouseMove={(e) => handleTimelineMouseMove(space, e)}
-                    onMouseLeave={handleTimelineMouseLeave}
                   >
-                    {/* Franjas de color: verde disponible, rojo reservado, gris no disponible (sin cuadrículas) */}
+                    {/* Franjas: verde = bloque disponible (duración del espacio), rojo = reservado, gris = no disponible */}
                     <div className="absolute inset-0">
                       {Array.from({ length: TOTAL_SLOTS }, (_, slotIndex) => {
-                        const status = getSlotStatus(space.id, slotIndex)
+                        const status = getSlotStatus(space, slotIndex)
                         const left = slotToPercent(slotIndex)
                         const width = (1 / TOTAL_SLOTS) * 100
                         return (
@@ -795,37 +685,13 @@ export function QuickBooking() {
                       )
                     })}
                     
-                    {/* Hover preview - muestra horario al pasar el mouse */}
-                    {hoveredSlot?.spaceId === space.id && !isActive && (
-                      <>
-                        <div 
-                          className="absolute top-0 bottom-0 w-1 bg-emerald-500/60 z-20"
-                          style={{ left: `${slotToPercent(hoveredSlot.slot)}%` }}
-                        />
-                        <div 
-                          className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-slate-800 text-emerald-400 text-xs font-bold rounded shadow-lg z-30 whitespace-nowrap border border-slate-700"
-                          style={{ left: `${slotToPercent(hoveredSlot.slot)}%` }}
-                        >
-                          {slotToTime(hoveredSlot.slot)}
-                        </div>
-                      </>
-                    )}
-                    
-                    {/* Selección activa - línea */}
-                    {isActive && (
+                    {/* Bloque seleccionado */}
+                    {selectedBlock && (
                       <div 
-                        className="absolute top-0 bottom-0 w-1 bg-emerald-500 z-30 shadow-lg shadow-emerald-500/50"
-                        style={{ left: `${slotToPercent(activeSelection.startSlot)}%` }}
-                      />
-                    )}
-                    
-                    {/* Preview de duración */}
-                    {isActive && hoveredDuration && (
-                      <div 
-                        className="absolute top-1 bottom-1 bg-emerald-500/40 rounded border-2 border-emerald-500 z-20"
+                        className="absolute top-1 bottom-1 rounded border-2 border-emerald-400 bg-emerald-500/30 z-20"
                         style={{
-                          left: `${slotToPercent(activeSelection.startSlot)}%`,
-                          width: `${(hoveredDuration / SLOT_DURATION / TOTAL_SLOTS) * 100}%`,
+                          left: `${slotToPercent(selectedBlock.startSlot)}%`,
+                          width: `${slotToPercent(selectedBlock.endSlot) - slotToPercent(selectedBlock.startSlot)}%`,
                         }}
                       />
                     )}
@@ -835,26 +701,19 @@ export function QuickBooking() {
             })}
           </div>
 
-          {/* Footer: leyenda por dispositivo; en mobile no decir "mouse" */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-3 bg-slate-800/80 border-t border-slate-700">
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <Info className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="md:inline hidden">Pasá el mouse para ver horarios • Tocá para reservar</span>
-              <span className="md:hidden">Deslizá para ver más horarios • Tocá para reservar</span>
+          {/* Leyenda de colores */}
+          <div className="flex flex-wrap items-center justify-center gap-4 px-5 py-3 bg-slate-800/80 border-t border-slate-700 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-4 rounded bg-emerald-500/80" />
+              <span className="text-slate-300">Disponible</span>
             </div>
-            <div className="flex flex-wrap items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-4 rounded bg-emerald-500/80" />
-                <span className="text-slate-300">Disponible</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-4 rounded bg-red-500/80" />
-                <span className="text-slate-300">Reservado</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-4 rounded bg-slate-600/80" />
-                <span className="text-slate-300">No disponible</span>
-              </div>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-4 rounded bg-red-500/80" />
+              <span className="text-slate-300">Reservado</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-4 rounded bg-slate-600/80" />
+              <span className="text-slate-300">No disponible</span>
             </div>
           </div>
         </div>
@@ -875,53 +734,37 @@ export function QuickBooking() {
             >
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-sm text-gray-500">
-                    {activeSelection.space.name}
-                  </p>
+                  <p className="text-sm font-medium text-slate-800">{activeSelection.space.name}</p>
                   {activeSelection.space.description && (
-                    <p className="text-xs text-gray-400 mt-0.5">{activeSelection.space.description}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{activeSelection.space.description}</p>
                   )}
-                  <p className="text-xl font-bold text-emerald-400 mt-1">
-                    Desde las <span className="text-emerald-400">{slotToTime(activeSelection.startSlot)}</span>
+                  <p className="text-lg font-bold text-emerald-600 mt-2">
+                    {slotToTime(activeSelection.startSlot)} – {getDurationOptions(activeSelection.space, activeSelection.startSlot)[0]?.endTime ?? addMinutesToTime(slotToTime(activeSelection.startSlot), activeSelection.space.duration)}
                   </p>
                 </div>
                 <button
                   onClick={handleCloseSelection}
-                  className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded-lg transition-colors"
+                  aria-label="Cerrar"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
               
-              <p className="text-xs text-gray-500 mb-3">Elegí la duración:</p>
-              
               <div className="space-y-2">
-                {getDurationOptions(activeSelection.space, activeSelection.startSlot).map((opt) => (
+                {getDurationOptions(activeSelection.space, activeSelection.startSlot)
+                  .filter(opt => opt.available)
+                  .map((opt) => (
                   <button
                     key={opt.minutes}
-                    disabled={!opt.available}
                     onClick={() => handleSelectDuration(opt)}
-                    onMouseEnter={() => opt.available && setHoveredDuration(opt.minutes)}
-                    onMouseLeave={() => setHoveredDuration(null)}
-                    className={cn(
-                      "w-full px-4 py-3.5 rounded-xl text-sm font-medium transition-all flex items-center justify-between gap-3",
-                      opt.available 
-                        ? "bg-emerald-500/10 hover:bg-emerald-500 text-slate-950 hover:text-slate-950 border border-emerald-500/30 hover:border-emerald-500 cursor-pointer hover:shadow-lg hover:shadow-emerald-500/20" 
-                        : "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
-                    )}
+                    className="w-full px-4 py-3.5 rounded-xl text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-600 cursor-pointer transition-colors flex items-center justify-between gap-3"
                   >
-                    <div className="flex flex-col items-start">
-                      <span className="font-bold text-base">{opt.label}</span>
-                      <span className="text-xs opacity-70">
-                        {slotToTime(activeSelection.startSlot)} → {opt.endTime}
-                      </span>
-                    </div>
-                    {opt.available && opt.service ? (
-                      <span className="font-bold text-lg text-emerald-400">
+                    <span className="font-semibold">{opt.label}</span>
+                    {opt.service != null && (
+                      <span className="font-bold">
                         {opt.service.price != null ? `$${Number(opt.service.price).toLocaleString()}` : 'Sin cargo'}
                       </span>
-                    ) : (
-                      <span className="text-xs">No disponible</span>
                     )}
                   </button>
                 ))}
