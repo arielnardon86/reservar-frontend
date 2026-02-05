@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { 
   useAppointments, 
   useUpdateAppointment,
-  useProfessionals,
   useServices,
 } from "@/lib/api/hooks"
 import { useTenantContext } from "@/lib/context/TenantContext"
@@ -52,14 +51,12 @@ export function AppointmentsCalendar() {
   const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null)
   const { tenantId, tenant } = useTenantContext()
   const { data: appointments, isLoading: loadingAppointments } = useAppointments()
-  const { data: professionals, isLoading: loadingProfessionals } = useProfessionals()
   const { data: services, isLoading: loadingServices } = useServices()
   const updateAppointment = useUpdateAppointment()
   const [availabilityData, setAvailabilityData] = useState<Record<string, TimeSlot[]>>({})
 
-  const isLoading = loadingAppointments || loadingProfessionals || loadingServices
-  const activeCourts = useMemo(() => professionals?.filter(c => c.isActive) || [], [professionals])
-  const baseService = useMemo(() => services?.find(s => s.isActive), [services])
+  const isLoading = loadingAppointments || loadingServices
+  const activeSpaces = useMemo(() => services?.filter(s => s.isActive) || [], [services])
 
   const hours = useMemo(() => {
     const h = []
@@ -69,26 +66,25 @@ export function AppointmentsCalendar() {
     return h
   }, [])
 
-  // Cargar disponibilidad
+  // Cargar disponibilidad por espacio (sin profesional)
   useEffect(() => {
-    if (!activeCourts.length || !baseService || !tenant?.slug) return
+    if (!activeSpaces.length || !tenant?.slug) return
 
     const loadAvailability = async () => {
       const newAvailability: Record<string, TimeSlot[]> = {}
       const dateStr = format(currentDate, 'yyyy-MM-dd')
 
-      for (const court of activeCourts) {
-        const key = `${court.id}-${dateStr}`
-          try {
-            const slots = await appointmentsApi.getAvailability(tenant.slug, {
-            professionalId: court.id,
-            serviceId: baseService.id,
-              date: dateStr,
-            })
-            newAvailability[key] = slots || []
-          } catch (error) {
-          console.error(`Error loading availability for ${court.id}:`, error)
-            newAvailability[key] = []
+      for (const space of activeSpaces) {
+        const key = `${space.id}-${dateStr}`
+        try {
+          const slots = await appointmentsApi.getAvailability(tenant.slug, {
+            serviceId: space.id,
+            date: dateStr,
+          })
+          newAvailability[key] = slots || []
+        } catch (error) {
+          console.error(`Error loading availability for ${space.id}:`, error)
+          newAvailability[key] = []
         }
       }
 
@@ -96,7 +92,7 @@ export function AppointmentsCalendar() {
     }
 
     loadAvailability()
-  }, [activeCourts, baseService, tenant?.slug, currentDate])
+  }, [activeSpaces, tenant?.slug, currentDate])
 
   // Filtrar turnos del día actual
   const dayAppointments = useMemo(() => {
@@ -108,40 +104,38 @@ export function AppointmentsCalendar() {
     })
   }, [appointments, currentDate])
 
-  // Agrupar turnos por cancha
-  const appointmentsByCourt = useMemo(() => {
+  // Agrupar turnos por espacio (serviceId)
+  const appointmentsBySpace = useMemo(() => {
     const grouped: Record<string, any[]> = {}
-    
-    activeCourts.forEach(court => {
-      grouped[court.id] = dayAppointments
-        .filter(apt => apt.professionalId === court.id)
-          .sort((a, b) => {
-            const timeA = parseISO(a.startTime).getTime()
-            const timeB = parseISO(b.startTime).getTime()
-            return timeA - timeB
-      })
+    activeSpaces.forEach(space => {
+      grouped[space.id] = dayAppointments
+        .filter(apt => apt.serviceId === space.id)
+        .sort((a, b) => {
+          const timeA = parseISO(a.startTime).getTime()
+          const timeB = parseISO(b.startTime).getTime()
+          return timeA - timeB
+        })
     })
-    
     return grouped
-  }, [dayAppointments, activeCourts])
+  }, [dayAppointments, activeSpaces])
 
   // Calcular ocupación global
   const globalOccupancy = useMemo(() => {
     let totalSlots = 0
     let occupiedSlots = 0
 
-    activeCourts.forEach(court => {
+    activeSpaces.forEach(space => {
       const dateStr = format(currentDate, 'yyyy-MM-dd')
-      const key = `${court.id}-${dateStr}`
+      const key = `${space.id}-${dateStr}`
       const slots = availabilityData[key] || []
-      const courtAppointments = appointmentsByCourt[court.id] || []
+      const spaceAppointments = appointmentsBySpace[space.id] || []
       
       totalSlots += slots.length
-      occupiedSlots += courtAppointments.length
+      occupiedSlots += spaceAppointments.length
     })
 
     return totalSlots > 0 ? (occupiedSlots / totalSlots) * 100 : 0
-  }, [availabilityData, appointmentsByCourt, activeCourts, currentDate])
+  }, [availabilityData, appointmentsBySpace, activeSpaces, currentDate])
 
   // Helper para calcular posición de turnos
   const getAppointmentPosition = (appointment: any) => {
@@ -164,9 +158,9 @@ export function AppointmentsCalendar() {
     return { leftPercent, widthPercent, startTimeStr }
   }
 
-  // Obtener bloques ocupados (para mostrar como en QuickBooking)
-  const getOccupiedBlocks = (courtId: string) => {
-    const appointments = appointmentsByCourt[courtId] || []
+  // Obtener bloques ocupados por espacio
+  const getOccupiedBlocks = (spaceId: string) => {
+    const appointments = appointmentsBySpace[spaceId] || []
     const blocks: Array<{ startSlot: number; endSlot: number }> = []
     
     appointments.forEach(apt => {
@@ -220,6 +214,18 @@ export function AppointmentsCalendar() {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="w-8 h-8 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!activeSpaces.length) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="text-5xl mb-4">🏢</div>
+        <h3 className="text-xl font-semibold text-slate-800 dark:text-white">Sin espacios configurados</h3>
+        <p className="text-slate-600 dark:text-slate-400 mt-2 max-w-sm">
+          Configurá espacios en la sección <strong>Espacios</strong> para ver las reservas del día aquí.
+        </p>
       </div>
     )
   }
@@ -279,19 +285,19 @@ export function AppointmentsCalendar() {
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>{dayAppointments.length} reservas</span>
-                <span>{activeCourts.length} canchas</span>
+                <span>{activeSpaces.length} espacios</span>
               </div>
             </div>
           </div>
         </div>
           </div>
 
-      {/* Timeline Grid - Todas las canchas juntas */}
+      {/* Timeline Grid - Espacios */}
       <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden shadow-xl">
         {/* Header con horas */}
         <div className="flex border-b border-slate-700 bg-slate-800">
           <div className="w-48 shrink-0 p-4 border-r border-white/20">
-            <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Canchas</span>
+            <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Espacios</span>
           </div>
           <div className="flex-1 flex">
             {hours.map((h) => (
@@ -305,49 +311,35 @@ export function AppointmentsCalendar() {
           </div>
         </div>
 
-        {/* Courts */}
+        {/* Espacios */}
         <div className="relative">
-          {activeCourts.map((court, idx) => {
-            const occupiedBlocks = getOccupiedBlocks(court.id)
-            const courtAppointments = appointmentsByCourt[court.id] || []
+          {activeSpaces.map((space, idx) => {
+            const occupiedBlocks = getOccupiedBlocks(space.id)
+            const spaceAppointments = appointmentsBySpace[space.id] || []
 
-              return (
+            return (
               <div 
-                key={court.id}
+                key={space.id}
                 className={cn(
                   "flex border-b border-gray-100 last:border-b-0",
                   idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
                 )}
               >
-                {/* Court info */}
+                {/* Espacio info */}
                 <div className="w-48 shrink-0 p-4 border-r border-gray-200 flex flex-col justify-center bg-gradient-to-r from-emerald-500/5 to-transparent">
-                  <div className="font-semibold text-emerald-400">{court.firstName}</div>
-                  <div className="text-xs text-gray-500">{court.lastName}</div>
-                  {court.bio && (
-                    <div className="text-[10px] text-gray-400 mt-1 line-clamp-1">{court.bio}</div>
+                  <div className="font-semibold text-emerald-400">{space.name}</div>
+                  {space.description && (
+                    <div className="text-[10px] text-gray-400 mt-1 line-clamp-1">{space.description}</div>
                   )}
                   <div className="text-[10px] text-emerald-400 font-medium mt-1">
-                    {courtAppointments.length} reservas
-                        </div>
-                      </div>
+                    {spaceAppointments.length} reservas
+                  </div>
+                </div>
                       
                 {/* Timeline */}
                 <div className="flex-1 h-16 relative select-none bg-gradient-to-b from-slate-800/50 to-slate-800/30">
-                  {/* Grid lines */}
-                  <div className="absolute inset-0 flex">
-                    {hours.map((_, i) => (
-                      <div 
-                        key={i} 
-                        className="flex-1 border-r border-slate-700/50 last:border-r-0"
-                      />
-                    ))}
-                    </div>
-                  
-                  {/* Línea central */}
-                  <div className="absolute top-1/2 left-0 right-0 h-px bg-slate-700/50" />
-                  
                   {/* Turnos como bloques */}
-                  {courtAppointments.map((apt) => {
+                  {spaceAppointments.map((apt) => {
                     const { leftPercent, widthPercent, startTimeStr } = getAppointmentPosition(apt)
                     const start = new Date(apt.startTime)
                     const end = new Date(apt.endTime)
@@ -369,9 +361,7 @@ export function AppointmentsCalendar() {
                         className={cn(
                           "absolute top-1 bottom-1 rounded-sm cursor-pointer transition-all hover:opacity-90 z-10 shadow-sm border-2",
                           apt.status === AppointmentStatus.CONFIRMED 
-                            ? "bg-emerald-500 text-emerald-400 border-emerald-500" 
-                            : apt.status === AppointmentStatus.PENDING
-                            ? "bg-emerald-500/70 text-emerald-400 border-emerald-500"
+                            ? "bg-emerald-500 text-white border-emerald-500" 
                             : "bg-slate-700 text-white border-slate-600",
                           isLongDuration && "ring-2 ring-amber-400/50"
                         )}
@@ -413,32 +403,20 @@ export function AppointmentsCalendar() {
           <div className="flex items-center gap-5 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-5 h-4 rounded bg-emerald-500" />
-              <span className="text-gray-500">Confirmada</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-              <div className="w-5 h-4 rounded bg-emerald-500/70 border-2 border-emerald-500" />
-              <span className="text-gray-500">Pendiente</span>
+              <span className="text-gray-500">Reserva</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Resumen */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card className="bg-white/95 border-white/20">
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-emerald-400">
               {dayAppointments.filter(a => a.status === AppointmentStatus.CONFIRMED).length}
             </p>
             <p className="text-sm text-gray-600">Confirmadas</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-white/95 border-white/20">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-emerald-400/70">
-              {dayAppointments.filter(a => a.status === AppointmentStatus.PENDING).length}
-            </p>
-            <p className="text-sm text-gray-600">Pendientes</p>
           </CardContent>
         </Card>
         <Card className="bg-white/95 border-white/20">
@@ -457,7 +435,7 @@ export function AppointmentsCalendar() {
             <p className="text-sm text-gray-600">Total Reservas</p>
           </CardContent>
         </Card>
-                      </div>
+      </div>
 
       {/* Popup de detalles del cliente */}
       {selectedAppointment && (
@@ -514,7 +492,7 @@ export function AppointmentsCalendar() {
                   </>
                 ) : selectedAppointment.professional ? (
                   <div>
-                    <Label className="text-gray-600 text-xs">Cancha</Label>
+                    <Label className="text-gray-600 text-xs">Recurso</Label>
                     <p className="text-gray-900 mt-1">{selectedAppointment.professional.fullName}</p>
                   </div>
                 ) : null}
@@ -559,28 +537,19 @@ export function AppointmentsCalendar() {
                   <Label className="text-gray-600 text-xs">Estado</Label>
                   <div className="mt-1">
                     {selectedAppointment.status === AppointmentStatus.CONFIRMED ? (
-                      <Badge className="bg-emerald-500 text-emerald-400">Confirmado</Badge>
-                    ) : selectedAppointment.status === AppointmentStatus.PENDING ? (
-                      <Badge className="bg-emerald-500/70 text-emerald-400 border-2 border-emerald-500">Pendiente</Badge>
-                    ) : (
+                      <Badge className="bg-emerald-500 text-white">Confirmado</Badge>
+                    ) : selectedAppointment.status === AppointmentStatus.CANCELLED ? (
+                      <Badge variant="secondary">Cancelado</Badge>
+                    ) : selectedAppointment.status === AppointmentStatus.COMPLETED ? (
                       <Badge variant="secondary">Completado</Badge>
+                    ) : (
+                      <Badge variant="outline">Pendiente</Badge>
                     )}
                   </div>
                 </div>
               </div>
               
               <div className="flex gap-2 pt-4 border-t border-gray-200">
-                {selectedAppointment.status === AppointmentStatus.PENDING && (
-                  <Button
-                    onClick={() => {
-                      handleQuickAction(selectedAppointment.id, "confirm")
-                      setSelectedAppointment(null)
-                    }}
-                    className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
-                  >
-                    Confirmar
-                  </Button>
-                )}
                 <Button
                   variant="outline"
                   onClick={() => setSelectedAppointment(null)}

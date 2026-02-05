@@ -240,6 +240,17 @@ export function QuickBooking() {
     return isHourAvailable(spaceId, slotHour) && !isSlotInPast(slotIndex)
   }
 
+  type SlotStatus = 'available' | 'reserved' | 'unavailable'
+  const getSlotStatus = (spaceId: string, slotIndex: number): SlotStatus => {
+    const blocks = getOccupiedBlocks(spaceId)
+    const inBlock = blocks.some(b => slotIndex >= b.startSlot && slotIndex < b.endSlot)
+    if (inBlock) return 'reserved'
+    if (isSlotInPast(slotIndex)) return 'unavailable'
+    const slotHour = Math.floor((HOUR_START * 60 + slotIndex * SLOT_DURATION) / 60)
+    if (!isHourAvailable(spaceId, slotHour)) return 'unavailable'
+    return 'available'
+  }
+
   const getOccupiedBlocks = (spaceId: string): OccupiedBlock[] => {
     const blocks: OccupiedBlock[] = []
     const appointments = dayAppointments[spaceId] || []
@@ -676,9 +687,9 @@ export function QuickBooking() {
         </div>
       </div>
 
-      {/* Timeline Grid - scroll horizontal en móvil para ver todos los horarios */}
+      {/* Timeline - scroll horizontal en móvil para ver todos los horarios */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10">
-        <p className="text-sm text-slate-400 mb-2 md:hidden text-center">Deslizá a la derecha para ver más horarios</p>
+        <p className="text-sm text-slate-400 mb-2 md:hidden text-center">Deslizá para ver más horarios</p>
         <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl overflow-x-auto">
           <div className="flex border-b border-slate-700 bg-slate-800 min-w-[min(100%,800px)] sm:min-w-0">
             <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700">
@@ -723,41 +734,38 @@ export function QuickBooking() {
                     <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5">{space.duration} min</div>
                   </div>
                   <div
-                    className="flex-1 h-14 sm:h-16 min-w-[min(100%,800px)] sm:min-w-0 relative cursor-pointer select-none bg-gradient-to-b from-slate-800/50 to-slate-800/30"
+                    className="flex-1 h-14 sm:h-16 min-w-[min(100%,800px)] sm:min-w-0 relative cursor-pointer select-none"
                     style={{ minWidth: `${hours.length * 48}px` }}
                     onClick={(e) => handleTimelineClick(space, e)}
                     onMouseMove={(e) => handleTimelineMouseMove(space, e)}
                     onMouseLeave={handleTimelineMouseLeave}
                   >
-                    {/* Grid lines - horas */}
-                    <div className="absolute inset-0 flex">
-                      {hours.map((_, i) => (
-                        <div 
-                          key={i} 
-                          className="flex-1 border-r border-slate-700/50 last:border-r-0"
-                        />
-                      ))}
-                    </div>
-                    
-                    {/* Grid lines - medias horas (más sutiles) */}
-                    <div className="absolute inset-0 flex">
-                      {hours.map((_, i) => (
-                        <div 
-                          key={`half-${i}`}
-                          className="flex-1 relative"
-                        >
-                          <div 
-                            className="absolute top-0 bottom-0 w-px border-l border-slate-700/50"
-                            style={{ left: '50%' }}
+                    {/* Franjas de color: verde disponible, rojo reservado, gris no disponible (sin cuadrículas) */}
+                    <div className="absolute inset-0">
+                      {Array.from({ length: TOTAL_SLOTS }, (_, slotIndex) => {
+                        const status = getSlotStatus(space.id, slotIndex)
+                        const left = slotToPercent(slotIndex)
+                        const width = (1 / TOTAL_SLOTS) * 100
+                        return (
+                          <div
+                            key={slotIndex}
+                            className="absolute top-0 bottom-0"
+                            style={{
+                              left: `${left}%`,
+                              width: `${width}%`,
+                              backgroundColor:
+                                status === 'available'
+                                  ? 'rgb(16 185 129 / 0.5)'
+                                  : status === 'reserved'
+                                    ? 'rgb(239 68 68 / 0.8)'
+                                    : 'rgb(51 65 85 / 0.6)',
+                            }}
                           />
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                     
-                    {/* Línea central sutil */}
-                    <div className="absolute top-1/2 left-0 right-0 h-px bg-slate-700/50" />
-                    
-                    {/* Bloques ocupados - usando appointments reales */}
+                    {/* Bloques ocupados - etiqueta sobre la franja roja */}
                     {occupiedBlocks.map((block, i) => {
                       const durationSlots = block.endSlot - block.startSlot
                       const durationMinutes = durationSlots * SLOT_DURATION
@@ -777,12 +785,7 @@ export function QuickBooking() {
                       return (
                         <div
                           key={i}
-                          className={cn(
-                            "absolute top-0 bottom-0 rounded-sm border-2",
-                            isLongDuration 
-                              ? "bg-amber-500/80 border-amber-600 shadow-sm" 
-                              : "bg-gray-300/80 border-gray-400"
-                          )}
+                          className="absolute top-0 bottom-0 rounded-sm border border-red-700/80 bg-red-500/90 shadow-sm z-10"
                           style={{
                             left: `${slotToPercent(block.startSlot)}%`,
                             width: `${slotToPercent(block.endSlot) - slotToPercent(block.startSlot)}%`,
@@ -790,11 +793,8 @@ export function QuickBooking() {
                           title={appointment ? `${startTime} - ${endTime} (${durationMinutes} min)` : `${startTime} - ${endTime}`}
                         >
                           <div className="absolute inset-0 flex items-center justify-center">
-                            <span className={cn(
-                              "text-[10px] font-bold uppercase tracking-wide",
-                              isLongDuration ? "text-white" : "text-gray-700"
-                            )}>
-                              {durationMinutes >= 90 ? `${Math.round(durationMinutes / 60 * 10) / 10}h` : durationMinutes >= 60 ? '1h' : 'Ocupado'}
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-white">
+                              {durationMinutes >= 90 ? `${Math.round(durationMinutes / 60 * 10) / 10}h` : durationMinutes >= 60 ? '1h' : 'Reservado'}
                             </span>
                           </div>
                         </div>
@@ -841,21 +841,25 @@ export function QuickBooking() {
             })}
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t border-gray-200">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Info className="w-4 h-4 text-emerald-400" />
-              <span>Pasá el mouse para ver horarios • Tocá para reservar</span>
+          {/* Footer: leyenda por dispositivo; en mobile no decir "mouse" */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-3 bg-slate-800/80 border-t border-slate-700">
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <Info className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="md:inline hidden">Pasá el mouse para ver horarios • Tocá para reservar</span>
+              <span className="md:hidden">Deslizá para ver más horarios • Tocá para reservar</span>
             </div>
-            
-            <div className="flex items-center gap-5 text-sm">
+            <div className="flex flex-wrap items-center gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-4 rounded bg-gray-300" />
-                <span className="text-gray-500">Ocupado</span>
+                <div className="w-5 h-4 rounded bg-emerald-500/80" />
+                <span className="text-slate-300">Disponible</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-5 h-4 rounded bg-emerald-500" />
-                <span className="text-gray-500">Tu reserva</span>
+                <div className="w-5 h-4 rounded bg-red-500/80" />
+                <span className="text-slate-300">Reservado</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-4 rounded bg-slate-600/80" />
+                <span className="text-slate-300">No disponible</span>
               </div>
             </div>
           </div>
