@@ -142,7 +142,7 @@ export function ServicesManager() {
             <div>
               <Label className="text-slate-300">Duración *</Label>
               <div className="mt-2 flex flex-wrap gap-2">
-                {PADEL_DURATIONS.map((duration) => (
+                {SPACE_DURATIONS.map((duration) => (
                   <Button
                     key={duration.value}
                     type="button"
@@ -315,7 +315,7 @@ export function ServicesManager() {
               <div>
                 <Label className="text-slate-300">Duración</Label>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {PADEL_DURATIONS.map((duration) => (
+                  {SPACE_DURATIONS.map((duration) => (
                     <Button
                       key={duration.value}
                       type="button"
