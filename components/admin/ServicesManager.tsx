@@ -299,10 +299,10 @@ export function ServicesManager() {
         </div>
       )}
 
-      {/* Modal de edición */}
+      {/* Modal de edición - scrollable para no cortar en pantallas chicas */}
       {editingId && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md bg-slate-900/50 border-slate-800">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-start justify-center p-4 py-8 min-h-0">
+          <Card className="w-full max-w-md my-auto max-h-[calc(100vh-4rem)] overflow-y-auto bg-slate-900/50 border-slate-800 shrink-0">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-white">⏱️ Editar Duración</CardTitle>

@@ -185,37 +185,20 @@ export function QuickBooking() {
   }, [activeSpaces, selectedDate, tenantSlug])
 
   const isHourAvailable = (spaceId: string, hour: number): boolean => {
-    // El backend envía horas en UTC, pero el frontend genera horas locales
-    // Necesitamos convertir la hora local a UTC para buscar en el mapa
+    // El backend solo devuelve slots dentro de los horarios abiertos (schedules).
+    // Si una hora no está en el mapa, está fuera de horario → no disponible (gris).
     const timeLocal = `${hour.toString().padStart(2, '0')}:00`
-    
-    // Convertir hora local a UTC para buscar en el mapa del backend
-    // Si estamos en UTC-3, la hora local 20:00 es 23:00 UTC
-    // getTimezoneOffset() devuelve minutos positivos cuando estás al oeste de UTC
     const offsetMinutes = new Date().getTimezoneOffset()
     const offsetHours = offsetMinutes / 60
-    // Para convertir de local a UTC cuando estás al oeste: sumar el offset
     const hourUTC = hour + offsetHours
-    
-    // Asegurarse de que la hora UTC esté en el rango válido (0-23)
     const hourUTCNormalized = ((hourUTC % 24) + 24) % 24
     const timeUTC = `${hourUTCNormalized.toString().padStart(2, '0')}:00`
     let available = availabilityMap.get(`${spaceId}-${timeUTC}`)
     if (available === undefined) {
       available = availabilityMap.get(`${spaceId}-${timeLocal}`)
     }
-    
-    // Si la hora está explícitamente en el mapa, usar ese valor
-    if (available !== undefined) {
-      return available
-    }
-    
-    // Si la hora no está en el mapa, verificar otras condiciones
-    // No verificar si está en el pasado aquí, porque eso se hace a nivel de slot en isSlotInPast
-    // Solo verificar que esté dentro del rango de horas posibles
-    // Si no está en el mapa pero está dentro del rango, asumir disponible
-    // (la verificación de pasado y conflictos se hace en isSlotInPast e isDurationAvailable)
-    return true
+    // Solo disponible si el backend lo marcó explícitamente como true (dentro de horario y libre)
+    return available === true
   }
 
   const isSlotInPast = (slotIndex: number): boolean => {
@@ -235,9 +218,20 @@ export function QuickBooking() {
     return slotDate.getTime() < now.getTime()
   }
 
+  // Disponibilidad por franja exacta (HH:mm); el backend solo devuelve slots dentro de horarios abiertos
+  const isSlotTimeInMapAvailable = (spaceId: string, timeLocal: string): boolean => {
+    const [h, m] = timeLocal.split(':').map(Number)
+    const d = new Date(selectedDate)
+    d.setHours(h, m, 0, 0)
+    const timeUTC = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+    const v = availabilityMap.get(`${spaceId}-${timeUTC}`)
+    if (v !== undefined) return v === true
+    return availabilityMap.get(`${spaceId}-${timeLocal}`) === true
+  }
+
   const isSlotAvailable = (spaceId: string, slotIndex: number): boolean => {
-    const slotHour = Math.floor((HOUR_START * 60 + slotIndex * SLOT_DURATION) / 60)
-    return isHourAvailable(spaceId, slotHour) && !isSlotInPast(slotIndex)
+    const timeStr = slotToTime(slotIndex)
+    return isSlotTimeInMapAvailable(spaceId, timeStr) && !isSlotInPast(slotIndex)
   }
 
   type SlotStatus = 'available' | 'reserved' | 'unavailable'
@@ -246,8 +240,8 @@ export function QuickBooking() {
     const inBlock = blocks.some(b => slotIndex >= b.startSlot && slotIndex < b.endSlot)
     if (inBlock) return 'reserved'
     if (isSlotInPast(slotIndex)) return 'unavailable'
-    const slotHour = Math.floor((HOUR_START * 60 + slotIndex * SLOT_DURATION) / 60)
-    if (!isHourAvailable(spaceId, slotHour)) return 'unavailable'
+    const timeStr = slotToTime(slotIndex)
+    if (!isSlotTimeInMapAvailable(spaceId, timeStr)) return 'unavailable'
     return 'available'
   }
 
