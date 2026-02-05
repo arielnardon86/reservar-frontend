@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { OnboardingWizard } from "@/components/admin/OnboardingWizard"
 import Link from "next/link"
@@ -50,10 +51,20 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function OnboardingFallback() {
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+    </div>
+  )
+}
+
 export default function OnboardingPage() {
   return (
-    <OnboardingGate>
-      <OnboardingWizard />
-    </OnboardingGate>
+    <Suspense fallback={<OnboardingFallback />}>
+      <OnboardingGate>
+        <OnboardingWizard />
+      </OnboardingGate>
+    </Suspense>
   )
 }
