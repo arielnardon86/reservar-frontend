@@ -95,6 +95,22 @@ const addMinutesToTime = (time: string, minutes: number): string => {
   return `${String(hCap).padStart(2, '0')}:${String(newM).padStart(2, '0')}`
 }
 
+// El backend devuelve un slot por bloque (ej. "11:00" para 240 min). El frontend necesita
+// cada segmento de 30 min marcado como disponible para pintar bloques verdes.
+const expandSlotToSegments = (startTime: string, durationMinutes: number, segmentMinutes: number = SLOT_DURATION): string[] => {
+  const [h, m] = startTime.split(':').map(Number)
+  let totalMins = h * 60 + m
+  const endMins = totalMins + durationMinutes
+  const segments: string[] = []
+  while (totalMins < endMins) {
+    const hh = Math.floor(totalMins / 60) % 24
+    const mm = totalMins % 60
+    segments.push(`${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`)
+    totalMins += segmentMinutes
+  }
+  return segments
+}
+
 export function QuickBooking() {
   const params = useParams()
   const tenantSlug = params?.tenantSlug as string
@@ -160,8 +176,14 @@ export function QuickBooking() {
               serviceId: space.id,
               date: dateStr,
             })
+            const duration = space.duration ?? 30
             slots.forEach((slot: TimeSlot) => {
-              newMap.set(`${space.id}-${slot.time}`, slot.available)
+              if (slot.available) {
+                const segmentTimes = expandSlotToSegments(slot.time, duration, SLOT_DURATION)
+                segmentTimes.forEach(t => newMap.set(`${space.id}-${t}`, true))
+              } else {
+                newMap.set(`${space.id}-${slot.time}`, false)
+              }
             })
           } catch (e) {
             console.error(`Error espacio ${space.id}:`, e)
@@ -624,10 +646,10 @@ export function QuickBooking() {
                               width: `${width}%`,
                               backgroundColor:
                                 status === 'available'
-                                  ? 'rgb(16 185 129 / 0.5)'
+                                  ? 'rgb(16 185 129 / 0.65)'
                                   : status === 'reserved'
-                                    ? 'rgb(239 68 68 / 0.8)'
-                                    : 'rgb(51 65 85 / 0.6)',
+                                    ? 'rgb(239 68 68 / 0.85)'
+                                    : 'rgb(51 65 85 / 0.65)',
                             }}
                           />
                         )
