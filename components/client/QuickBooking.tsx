@@ -206,6 +206,47 @@ export function QuickBooking() {
     return availabilityMap.get(`${spaceId}-${timeLocal}`) === true
   }
 
+  // Bloques ocupados por reservas (debe estar antes de getAvailableBlocks que lo usa)
+  const getOccupiedBlocks = (spaceId: string): OccupiedBlock[] => {
+    const blocks: OccupiedBlock[] = []
+    const appointments = dayAppointments[spaceId] || []
+    appointments.forEach(apt => {
+      const start = new Date(apt.startTime)
+      const end = new Date(apt.endTime)
+      const startHour = start.getHours()
+      const startMin = start.getMinutes()
+      const endHour = end.getHours()
+      const endMin = end.getMinutes()
+      const startTimeStr = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`
+      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+      const startSlot = timeToSlot(startTimeStr)
+      const endSlot = startSlot + (durationMinutes / SLOT_DURATION)
+      blocks.push({ startSlot, endSlot })
+    })
+    const pastSlots: number[] = []
+    for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
+      if (isSlotInPast(slot)) {
+        const isCovered = blocks.some(block => slot >= block.startSlot && slot < block.endSlot)
+        if (!isCovered) pastSlots.push(slot)
+      }
+    }
+    if (pastSlots.length > 0) {
+      let currentPastBlock: OccupiedBlock | null = null
+      pastSlots.forEach(slot => {
+        if (!currentPastBlock) {
+          currentPastBlock = { startSlot: slot, endSlot: slot + 1 }
+        } else if (slot === currentPastBlock.endSlot) {
+          currentPastBlock.endSlot = slot + 1
+        } else {
+          blocks.push(currentPastBlock)
+          currentPastBlock = { startSlot: slot, endSlot: slot + 1 }
+        }
+      })
+      if (currentPastBlock) blocks.push(currentPastBlock)
+    }
+    return blocks.sort((a, b) => a.startSlot - b.startSlot)
+  }
+
   // Bloques disponibles: misma duración que el espacio, alineados desde la apertura, sin superponer reservas
   const getAvailableBlocks = (space: Service): OccupiedBlock[] => {
     const durationSlots = Math.floor(space.duration / SLOT_DURATION)
@@ -263,62 +304,6 @@ export function QuickBooking() {
   const getAvailableBlockAtSlot = (space: Service, slotIndex: number): OccupiedBlock | null => {
     const blocks = getAvailableBlocksCached(space)
     return blocks.find(b => slotIndex >= b.startSlot && slotIndex < b.endSlot) ?? null
-  }
-
-  const getOccupiedBlocks = (spaceId: string): OccupiedBlock[] => {
-    const blocks: OccupiedBlock[] = []
-    const appointments = dayAppointments[spaceId] || []
-    
-    // Usar appointments reales para calcular bloques ocupados
-    appointments.forEach(apt => {
-      const start = new Date(apt.startTime)
-      const end = new Date(apt.endTime)
-      
-      // Usar hora local del navegador (no UTC)
-      const startHour = start.getHours()
-      const startMin = start.getMinutes()
-      const endHour = end.getHours()
-      const endMin = end.getMinutes()
-      
-      const startTimeStr = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`
-      const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`
-      
-      const startSlot = timeToSlot(startTimeStr)
-      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
-      const endSlot = startSlot + (durationMinutes / SLOT_DURATION)
-      
-      blocks.push({ startSlot, endSlot })
-    })
-    
-    // También marcar slots del pasado como ocupados (solo si no están ya cubiertos)
-    const pastSlots: number[] = []
-    for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
-      if (isSlotInPast(slot)) {
-        const isCovered = blocks.some(block => slot >= block.startSlot && slot < block.endSlot)
-        if (!isCovered) {
-          pastSlots.push(slot)
-        }
-      }
-    }
-    
-    // Agrupar slots del pasado en bloques continuos
-    if (pastSlots.length > 0) {
-      let currentPastBlock: OccupiedBlock | null = null
-      pastSlots.forEach(slot => {
-        if (!currentPastBlock) {
-          currentPastBlock = { startSlot: slot, endSlot: slot + 1 }
-        } else if (slot === currentPastBlock.endSlot) {
-          currentPastBlock.endSlot = slot + 1
-        } else {
-          blocks.push(currentPastBlock)
-          currentPastBlock = { startSlot: slot, endSlot: slot + 1 }
-        }
-      })
-      if (currentPastBlock) blocks.push(currentPastBlock)
-    }
-    
-    // Ordenar bloques por startSlot
-    return blocks.sort((a, b) => a.startSlot - b.startSlot)
   }
 
   const getDurationOptions = (space: Service, startSlot: number): DurationOption[] => {
