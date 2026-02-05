@@ -28,6 +28,8 @@ export interface BookingData {
   clientName?: string
   clientLastName?: string
   clientEmail?: string
+  clientDepartamento?: string
+  clientPiso?: string
 }
 
 // Labels para los pasos en contexto pádel
@@ -190,11 +192,13 @@ export function ClientBooking() {
           {step === "info" && (
             <ClientInfoForm
               tenant={tenant}
-              onSubmit={(name, lastName, email) => {
+              onSubmit={(name, lastName, email, departamento, piso) => {
                 updateBooking({
                   clientName: name,
                   clientLastName: lastName,
                   clientEmail: email,
+                  clientDepartamento: departamento,
+                  clientPiso: piso,
                 })
                 nextStep()
               }}

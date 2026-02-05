@@ -9,7 +9,7 @@ import type { Tenant } from "@/lib/api/types"
 
 interface ClientInfoFormProps {
   tenant?: Tenant | null
-  onSubmit: (name: string, lastName: string, email: string) => void
+  onSubmit: (name: string, lastName: string, email: string, departamento: string, piso: string) => void
   onBack: () => void
 }
 
@@ -17,15 +17,17 @@ export function ClientInfoForm({ tenant, onSubmit, onBack }: ClientInfoFormProps
   const [name, setName] = useState("")
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
+  const [departamento, setDepartamento] = useState("")
+  const [piso, setPiso] = useState("")
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (name && lastName && email) {
-      onSubmit(name, lastName, email)
+    if (name && lastName && email && departamento && piso) {
+      onSubmit(name, lastName, email, departamento, piso)
     }
   }
 
-  const isValid = name.trim() && lastName.trim() && email.trim().includes("@")
+  const isValid = name.trim() && lastName.trim() && email.trim().includes("@") && departamento.trim() && piso.trim()
 
   return (
     <div>
@@ -84,6 +86,31 @@ export function ClientInfoForm({ tenant, onSubmit, onBack }: ClientInfoFormProps
           <p className="text-sm text-gray-500">
             Te enviaremos la confirmación a este correo
           </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="departamento">Departamento *</Label>
+            <Input
+              id="departamento"
+              type="text"
+              placeholder="Ej: 3B"
+              value={departamento}
+              onChange={(e) => setDepartamento(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="piso">Piso *</Label>
+            <Input
+              id="piso"
+              type="text"
+              placeholder="Ej: 2"
+              value={piso}
+              onChange={(e) => setPiso(e.target.value)}
+              required
+            />
+          </div>
         </div>
 
         <Button 

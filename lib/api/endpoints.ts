@@ -26,6 +26,17 @@ import type {
 } from './types';
 
 // ============================================
+// ONBOARDING TOKENS (links de suscripción de un solo uso)
+// ============================================
+
+export const onboardingTokensApi = {
+  validate: (token: string) =>
+    apiClient.get<{ valid: boolean }>(`/onboarding-tokens/validate?token=${encodeURIComponent(token)}`),
+  create: (adminSecret: string) =>
+    apiClient.post<{ token: string }>('/onboarding-tokens', { adminSecret }),
+};
+
+// ============================================
 // TENANTS
 // ============================================
 

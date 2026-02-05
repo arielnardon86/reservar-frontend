@@ -120,7 +120,7 @@ export function QuickBooking() {
   
   const [selectedSlot, setSelectedSlot] = useState<BookingSelection | null>(null)
   const [showModal, setShowModal] = useState(false)
-  const [bookingForm, setBookingForm] = useState({ name: "", lastName: "", email: "" })
+  const [bookingForm, setBookingForm] = useState({ name: "", lastName: "", email: "", departamento: "", piso: "" })
   const [isBooking, setIsBooking] = useState(false)
   const [bookingSuccess, setBookingSuccess] = useState(false)
   
@@ -476,7 +476,7 @@ export function QuickBooking() {
   }
 
   const handleConfirmBooking = async () => {
-    if (!selectedSlot || !bookingForm.name || !bookingForm.lastName || !bookingForm.email) {
+    if (!selectedSlot || !bookingForm.name || !bookingForm.lastName || !bookingForm.email || !bookingForm.departamento || !bookingForm.piso) {
       toast.error("Completa todos los campos")
       return
     }
@@ -497,6 +497,8 @@ export function QuickBooking() {
         serviceId: selectedSlot.space.id,
         startTime: startTime.toISOString(),
         status: 'CONFIRMED' as AppointmentStatus,
+        departamento: bookingForm.departamento,
+        piso: bookingForm.piso,
       })
 
       // Esperar un momento para asegurar que la transacción se complete
@@ -538,7 +540,7 @@ export function QuickBooking() {
   const handleCloseModal = () => {
     setShowModal(false)
     setSelectedSlot(null)
-    setBookingForm({ name: "", lastName: "", email: "" })
+    setBookingForm({ name: "", lastName: "", email: "", departamento: "", piso: "" })
     setBookingSuccess(false)
   }
 
@@ -716,9 +718,9 @@ export function QuickBooking() {
                   <div className="w-48 shrink-0 p-4 border-r border-slate-700 flex flex-col justify-center bg-slate-800/50">
                     <div className="font-semibold text-emerald-400">{space.name}</div>
                     {space.description && (
-                      <div className="text-[10px] text-gray-400 mt-1 line-clamp-1">{space.description}</div>
+                      <div className="text-xs text-slate-400 mt-1 line-clamp-2" title={space.description}>{space.description}</div>
                     )}
-                    <div className="text-xs text-gray-500 mt-0.5">{space.duration} min</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{space.duration} min</div>
                   </div>
                   <div
                     className="flex-1 h-16 relative cursor-pointer select-none bg-gradient-to-b from-slate-800/50 to-slate-800/30"
@@ -877,7 +879,10 @@ export function QuickBooking() {
                   <p className="text-sm text-gray-500">
                     {activeSelection.space.name}
                   </p>
-                  <p className="text-xl font-bold text-emerald-400">
+                  {activeSelection.space.description && (
+                    <p className="text-xs text-gray-400 mt-0.5">{activeSelection.space.description}</p>
+                  )}
+                  <p className="text-xl font-bold text-emerald-400 mt-1">
                     Desde las <span className="text-emerald-400">{slotToTime(activeSelection.startSlot)}</span>
                   </p>
                 </div>
@@ -951,6 +956,9 @@ export function QuickBooking() {
                       <div>
                         <span className="text-slate-500">Espacio</span>
                         <p className="font-semibold text-emerald-600 dark:text-emerald-400">{selectedSlot.space.name}</p>
+                        {selectedSlot.space.description && (
+                          <p className="text-xs text-slate-500 mt-0.5">{selectedSlot.space.description}</p>
+                        )}
                       </div>
                       <div>
                         <span className="text-slate-500">Duración</span>
@@ -1013,8 +1021,28 @@ export function QuickBooking() {
                         value={bookingForm.email}
                         onChange={(e) => setBookingForm(p => ({ ...p, email: e.target.value }))}
                         placeholder="juan@email.com"
-                        className="mt-1 border-gray-300 focus:border-[#0a4d8c] focus:ring-[#0a4d8c]/20"
+                        className="mt-1 border-gray-300 focus:border-emerald-500 focus:ring-emerald-500/20"
                       />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-gray-600">Departamento *</Label>
+                        <Input
+                          value={bookingForm.departamento}
+                          onChange={(e) => setBookingForm(p => ({ ...p, departamento: e.target.value }))}
+                          placeholder="Ej: 3B"
+                          className="mt-1 border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-gray-600">Piso *</Label>
+                        <Input
+                          value={bookingForm.piso}
+                          onChange={(e) => setBookingForm(p => ({ ...p, piso: e.target.value }))}
+                          placeholder="Ej: 2"
+                          className="mt-1 border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20"
+                        />
+                      </div>
                     </div>
 
                     <div className="flex gap-3 pt-2">
@@ -1028,7 +1056,7 @@ export function QuickBooking() {
                       </Button>
                       <Button
                         onClick={handleConfirmBooking}
-                        disabled={isBooking || !bookingForm.name || !bookingForm.lastName || !bookingForm.email}
+                        disabled={isBooking || !bookingForm.name || !bookingForm.lastName || !bookingForm.email || !bookingForm.departamento || !bookingForm.piso}
                         className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl"
                       >
                         {isBooking ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}

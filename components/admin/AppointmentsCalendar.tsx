@@ -501,13 +501,26 @@ export function AppointmentsCalendar() {
                   </div>
                 </div>
                 
-                <div>
-                  <Label className="text-gray-600 text-xs">Cancha</Label>
-                  <p className="text-gray-900 mt-1">{selectedAppointment.professional.fullName}</p>
-                </div>
+                {(selectedAppointment as any).departamento || (selectedAppointment as any).piso ? (
+                  <>
+                    <div>
+                      <Label className="text-gray-600 text-xs">Departamento</Label>
+                      <p className="text-gray-900 mt-1">{(selectedAppointment as any).departamento || '-'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-600 text-xs">Piso</Label>
+                      <p className="text-gray-900 mt-1">{(selectedAppointment as any).piso || '-'}</p>
+                    </div>
+                  </>
+                ) : selectedAppointment.professional ? (
+                  <div>
+                    <Label className="text-gray-600 text-xs">Cancha</Label>
+                    <p className="text-gray-900 mt-1">{selectedAppointment.professional.fullName}</p>
+                  </div>
+                ) : null}
                 
                 <div>
-                  <Label className="text-gray-600 text-xs">Duración</Label>
+                  <Label className="text-gray-600 text-xs">Espacio / Duración</Label>
                   <p className="text-gray-900 mt-1">{selectedAppointment.service.name}</p>
                 </div>
                 

@@ -138,8 +138,11 @@ export function AppointmentsManager() {
     return (
       appointment.customer.firstName.toLowerCase().includes(search) ||
       appointment.customer.lastName.toLowerCase().includes(search) ||
+      appointment.customer.email.toLowerCase().includes(search) ||
       appointment.service.name.toLowerCase().includes(search) ||
-      appointment.professional.fullName.toLowerCase().includes(search)
+      (appointment.professional?.fullName?.toLowerCase().includes(search)) ||
+      (appointment.departamento?.toLowerCase().includes(search)) ||
+      (appointment.piso?.toLowerCase().includes(search))
     )
   })
 
@@ -194,7 +197,7 @@ export function AppointmentsManager() {
                 <TableRow>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Servicio</TableHead>
-                  <TableHead>Profesional</TableHead>
+                  <TableHead>Depto / Piso</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Hora</TableHead>
                   <TableHead>Estado</TableHead>
@@ -209,10 +212,15 @@ export function AppointmentsManager() {
                   return (
                     <TableRow key={appointment.id}>
                       <TableCell className="font-medium">
-                        {appointment.customer.firstName} {appointment.customer.lastName}
+                        <div>{appointment.customer.firstName} {appointment.customer.lastName}</div>
+                        <div className="text-xs text-slate-500">{appointment.customer.email}</div>
                       </TableCell>
                       <TableCell>{appointment.service.name}</TableCell>
-                      <TableCell>{appointment.professional.fullName}</TableCell>
+                      <TableCell className="text-slate-400">
+                        {appointment.departamento || appointment.piso
+                          ? `${appointment.departamento || '-'} / ${appointment.piso || '-'}`
+                          : appointment.professional?.fullName ?? '-'}
+                      </TableCell>
                       <TableCell>
                         {format(startDate, "dd/MM/yyyy", { locale: es })}
                       </TableCell>

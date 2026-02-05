@@ -45,7 +45,7 @@ export function BookingConfirmation({
   const hasCreatedRef = useRef(false)
   const isCreatingRef = useRef(false)
 
-  const { service, professional, date, time, clientName, clientLastName, clientEmail } =
+  const { service, professional, date, time, clientName, clientLastName, clientEmail, clientDepartamento, clientPiso } =
     bookingData
 
   // Obtener tenantSlug: primero de params, luego del tenant cargado
@@ -123,6 +123,8 @@ export function BookingConfirmation({
           professionalId: professional.id,
           startTime: startTime.toISOString(),
           status: AppointmentStatus.PENDING,
+          departamento: clientDepartamento,
+          piso: clientPiso,
         })
 
         console.log('[BookingConfirmation] Appointment created successfully:', createdAppointment.id)

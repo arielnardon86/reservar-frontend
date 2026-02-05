@@ -89,11 +89,18 @@ export default function SuscripcionPage() {
             </CardContent>
           </Card>
 
-          <Link href="/login">
-            <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl">
-              Ya tengo cuenta — Ir al panel
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/login">
+              <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl">
+                Ya tengo cuenta — Ir al panel
+              </Button>
+            </Link>
+            <Link href="/generar-link">
+              <Button variant="ghost" className="text-slate-500 hover:text-slate-400 text-sm">
+                Generar link de suscripción
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
     </div>

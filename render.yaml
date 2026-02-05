@@ -1,0 +1,12 @@
+# Render: Next.js debe ser Web Service (servidor Node), no Static Site.
+# Ver: https://render.com/docs/deploy-nextjs-app
+
+services:
+  - type: web
+    name: reservar-frontend
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production

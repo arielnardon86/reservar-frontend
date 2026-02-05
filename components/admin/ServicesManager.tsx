@@ -140,6 +140,15 @@ export function ServicesManager() {
               />
             </div>
             <div>
+              <Label className="text-slate-300">Descripción (visible para clientes)</Label>
+              <Input
+                value={formData.description || ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value || undefined })}
+                placeholder="Ej: Habilitado para un máximo de 8 personas"
+                className="mt-2 bg-slate-800 border-slate-700 text-white"
+              />
+            </div>
+            <div>
               <Label className="text-slate-300">Duración *</Label>
               <div className="mt-2 flex flex-wrap gap-2">
                 {SPACE_DURATIONS.map((duration) => (
@@ -309,6 +318,15 @@ export function ServicesManager() {
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="mt-2 bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">Descripción (visible para clientes)</Label>
+                <Input
+                  value={formData.description || ''}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value || undefined })}
+                  placeholder="Ej: Habilitado para un máximo de 8 personas"
                   className="mt-2 bg-slate-800 border-slate-700 text-white"
                 />
               </div>

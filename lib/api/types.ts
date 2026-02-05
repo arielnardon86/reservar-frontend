@@ -36,6 +36,8 @@ export interface CreateTenantDto {
   locale?: string;
   /** Contraseña del administrador (onboarding) */
   password?: string;
+  /** Token de invitación (obligatorio para link de suscripción de un solo uso) */
+  inviteToken?: string;
 }
 
 export interface UpdateTenantDto {
@@ -217,6 +219,8 @@ export interface Appointment {
   reminderSentAt?: string;
   confirmationSentAt?: string;
   notes?: string;
+  departamento?: string;
+  piso?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -242,6 +246,8 @@ export interface CreateAppointmentDto {
   startTime: string;   // ISO string
   status?: AppointmentStatus;
   notes?: string;
+  departamento?: string;  // Depto (edificios)
+  piso?: string;         // Piso (edificios)
 }
 
 export interface UpdateAppointmentDto {

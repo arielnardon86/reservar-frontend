@@ -129,7 +129,12 @@ function normalizeDaySchedule(day: unknown, key: string): DaySchedule {
   }
 }
 
-export function OnboardingWizard() {
+interface OnboardingWizardProps {
+  /** Token de invitación (obligatorio para link de suscripción de un solo uso) */
+  inviteToken?: string
+}
+
+export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -263,6 +268,7 @@ export function OnboardingWizard() {
         secondaryColor: "#34d399",
         logoUrl: data.logoUrl,
         password,
+        ...(inviteToken && { inviteToken }),
       })
       
       setCreatedTenantSlug(tenantSlug)
