@@ -464,7 +464,6 @@ export function QuickBooking() {
       startTime,
       endTime: option.endTime,
       duration: option.minutes,
-      service: option.service
     })
     setActiveSelection(null)
     setHoveredDuration(null)
