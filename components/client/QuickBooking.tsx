@@ -269,39 +269,73 @@ export function QuickBooking() {
     return blocks.sort((a, b) => a.startSlot - b.startSlot)
   }
 
-  // Bloques disponibles: misma duración que el espacio, alineados desde la apertura, sin superponer reservas
+  // Bloques disponibles: misma duración que el espacio, detectando todas las franjas de disponibilidad
   const getAvailableBlocks = (space: Service): OccupiedBlock[] => {
     const durationSlots = Math.floor(space.duration / SLOT_DURATION)
     if (durationSlots < 1 || durationSlots > TOTAL_SLOTS) return []
     const reserved = getOccupiedBlocks(space.id)
-    let openingSlot: number | null = null
+    const blocks: OccupiedBlock[] = []
+    
+    // Encontrar todas las franjas de disponibilidad (slots consecutivos disponibles)
+    const availableSlots: number[] = []
     for (let s = 0; s < TOTAL_SLOTS; s++) {
       if (isSlotInPast(s)) continue
       const timeStr = slotToTime(s)
       if (isSlotTimeInMapAvailable(space.id, timeStr)) {
-        openingSlot = s
-        break
+        // Verificar que no esté reservado
+        const isReserved = reserved.some(r => s >= r.startSlot && s < r.endSlot)
+        if (!isReserved) {
+          availableSlots.push(s)
+        }
       }
     }
-    if (openingSlot == null) return []
-    const blocks: OccupiedBlock[] = []
-    for (let k = 0; ; k++) {
-      const startSlot = openingSlot + k * durationSlots
-      const endSlot = startSlot + durationSlots
-      if (endSlot > TOTAL_SLOTS) break
-      const anyPast = Array.from({ length: durationSlots }, (_, i) => startSlot + i).some(isSlotInPast)
-      if (anyPast) continue
-      const allInSchedule = Array.from({ length: durationSlots }, (_, i) => slotToTime(startSlot + i)).every(
-        t => isSlotTimeInMapAvailable(space.id, t)
-      )
-      if (!allInSchedule) continue
-      const overlaps = reserved.some(
-        r => !(endSlot <= r.startSlot || startSlot >= r.endSlot)
-      )
-      if (overlaps) continue
-      blocks.push({ startSlot, endSlot })
+    
+    if (availableSlots.length === 0) return []
+    
+    // Agrupar slots consecutivos en franjas
+    const ranges: Array<{ start: number; end: number }> = []
+    let currentRange: { start: number; end: number } | null = null
+    
+    for (const slot of availableSlots) {
+      if (!currentRange) {
+        currentRange = { start: slot, end: slot + 1 }
+      } else if (slot === currentRange.end) {
+        currentRange.end = slot + 1
+      } else {
+        // Gap detectado: guardar el rango anterior y empezar uno nuevo
+        ranges.push(currentRange)
+        currentRange = { start: slot, end: slot + 1 }
+      }
     }
-    return blocks
+    if (currentRange) {
+      ranges.push(currentRange)
+    }
+    
+    // Para cada franja, generar bloques de la duración del espacio
+    for (const range of ranges) {
+      const rangeLength = range.end - range.start
+      if (rangeLength < durationSlots) continue // La franja es más corta que la duración requerida
+      
+      // Generar bloques dentro de esta franja, empezando desde el inicio
+      for (let startSlot = range.start; startSlot + durationSlots <= range.end; startSlot += durationSlots) {
+        const endSlot = startSlot + durationSlots
+        
+        // Verificar que todos los slots del bloque estén disponibles y no reservados
+        const allAvailable = Array.from({ length: durationSlots }, (_, i) => startSlot + i).every(
+          slotIdx => {
+            const timeStr = slotToTime(slotIdx)
+            return isSlotTimeInMapAvailable(space.id, timeStr) && 
+                   !reserved.some(r => slotIdx >= r.startSlot && slotIdx < r.endSlot)
+          }
+        )
+        
+        if (allAvailable) {
+          blocks.push({ startSlot, endSlot })
+        }
+      }
+    }
+    
+    return blocks.sort((a, b) => a.startSlot - b.startSlot)
   }
 
   type SlotStatus = 'available' | 'reserved' | 'unavailable'
@@ -587,10 +621,12 @@ export function QuickBooking() {
       {/* Timeline - scroll horizontal en móvil para ver todos los horarios */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10">
         <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl overflow-x-auto">
-          <div className="flex border-b border-slate-700 bg-slate-800 min-w-[min(100%,800px)] sm:min-w-0">
-            <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700">
+          <div className="flex border-b border-slate-700 bg-slate-800 min-w-[min(100%,800px)] sm:min-w-0 relative">
+            {/* Columna izquierda fija - Header */}
+            <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 sticky left-0 z-30 bg-slate-800 shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
               <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Espacios</span>
             </div>
+            {/* Horarios scrolleables */}
             <div className="flex flex-1" style={{ minWidth: `${hours.length * 48}px` }}>
               {hours.map((h) => (
                 <div 
@@ -617,9 +653,10 @@ export function QuickBooking() {
               return (
                 <div
                   key={space.id}
-                  className="flex border-b border-slate-700 last:border-b-0 bg-slate-800/60"
+                  className="flex border-b border-slate-700 last:border-b-0 bg-slate-800/60 relative"
                 >
-                  <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 flex flex-col justify-center bg-slate-800">
+                  {/* Columna izquierda fija - Nombre del espacio */}
+                  <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 flex flex-col justify-center bg-slate-800 sticky left-0 z-20 shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
                     <div className="font-semibold text-white text-sm sm:text-base">{space.name}</div>
                     {space.description && (
                       <div className="text-[10px] sm:text-xs text-slate-300 mt-0.5 line-clamp-2" title={space.description}>{space.description}</div>
@@ -633,23 +670,75 @@ export function QuickBooking() {
                   >
                     {/* Franjas: verde = bloque disponible (duración del espacio), rojo = reservado, gris = no disponible */}
                     <div className="absolute inset-0">
+                      {/* Pintar fondo gris por defecto */}
                       {Array.from({ length: TOTAL_SLOTS }, (_, slotIndex) => {
-                        const status = getSlotStatus(space, slotIndex)
                         const left = slotToPercent(slotIndex)
                         const width = (1 / TOTAL_SLOTS) * 100
                         return (
                           <div
-                            key={slotIndex}
+                            key={`bg-${slotIndex}`}
                             className="absolute top-0 bottom-0"
                             style={{
                               left: `${left}%`,
                               width: `${width}%`,
-                              backgroundColor:
-                                status === 'available'
-                                  ? 'rgb(16 185 129 / 0.65)'
-                                  : status === 'reserved'
-                                    ? 'rgb(239 68 68 / 0.85)'
-                                    : 'rgb(51 65 85 / 0.65)',
+                              backgroundColor: 'rgb(51 65 85 / 0.65)',
+                            }}
+                          />
+                        )
+                      })}
+
+                      {/* Bloques disponibles como segmentos con separación visual */}
+                      {getAvailableBlocksCached(space).map((block, idx) => {
+                        const left = slotToPercent(block.startSlot)
+                        const width = slotToPercent(block.endSlot) - slotToPercent(block.startSlot)
+                        const blocks = getAvailableBlocksCached(space)
+                        const prevBlock = idx > 0 ? blocks[idx - 1] : null
+                        const nextBlock = idx < blocks.length - 1 ? blocks[idx + 1] : null
+                        
+                        // Detectar si hay un gap antes o después de este bloque
+                        const hasGapBefore = prevBlock ? (block.startSlot - prevBlock.endSlot) > 0 : false
+                        const hasGapAfter = nextBlock ? (nextBlock.startSlot - block.endSlot) > 0 : false
+                        
+                        return (
+                          <div
+                            key={`avail-${space.id}-${idx}`}
+                            className="absolute top-1 bottom-1 rounded-sm"
+                            style={{
+                              left: `${left}%`,
+                              width: `${width}%`,
+                              backgroundColor: 'rgb(16 185 129 / 0.75)',
+                              boxShadow: 'inset 0 0 0 1px rgba(6,95,70,0.9)',
+                              // Separación visual: siempre bordes oscuros para distinguir bloques
+                              // Si hay gap antes, el borde izquierdo será más visible
+                              borderLeft: hasGapBefore || idx === 0 
+                                ? '2px solid rgba(15,23,42,1)' 
+                                : '1px solid rgba(6,95,70,0.5)',
+                              // Si hay gap después, el borde derecho será más visible
+                              borderRight: hasGapAfter || idx === blocks.length - 1
+                                ? '2px solid rgba(15,23,42,1)' 
+                                : '1px solid rgba(6,95,70,0.5)',
+                              // Margen para crear gap visual cuando hay separación real
+                              marginLeft: hasGapBefore ? '2px' : '0',
+                              marginRight: hasGapAfter ? '2px' : '0',
+                            }}
+                          />
+                        )
+                      })}
+
+                      {/* Slots reservados sobre los bloques disponibles */}
+                      {Array.from({ length: TOTAL_SLOTS }, (_, slotIndex) => {
+                        const status = getSlotStatus(space, slotIndex)
+                        if (status !== 'reserved') return null
+                        const left = slotToPercent(slotIndex)
+                        const width = (1 / TOTAL_SLOTS) * 100
+                        return (
+                          <div
+                            key={`res-${slotIndex}`}
+                            className="absolute top-0 bottom-0"
+                            style={{
+                              left: `${left}%`,
+                              width: `${width}%`,
+                              backgroundColor: 'rgb(239 68 68 / 0.85)',
                             }}
                           />
                         )

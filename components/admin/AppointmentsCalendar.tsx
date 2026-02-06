@@ -293,12 +293,14 @@ export function AppointmentsCalendar() {
           </div>
 
       {/* Timeline Grid - Espacios */}
-      <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden shadow-xl">
+      <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden shadow-xl overflow-x-auto">
         {/* Header con horas */}
-        <div className="flex border-b border-slate-700 bg-slate-800">
-          <div className="w-48 shrink-0 p-4 border-r border-white/20">
+        <div className="flex border-b border-slate-700 bg-slate-800 relative">
+          {/* Columna izquierda fija - Header */}
+          <div className="w-48 shrink-0 p-4 border-r border-white/20 sticky left-0 z-30 bg-slate-800 shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
             <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Espacios</span>
           </div>
+          {/* Horarios scrolleables */}
           <div className="flex-1 flex">
             {hours.map((h) => (
               <div 
@@ -321,12 +323,12 @@ export function AppointmentsCalendar() {
               <div 
                 key={space.id}
                 className={cn(
-                  "flex border-b border-gray-100 last:border-b-0",
+                  "flex border-b border-gray-100 last:border-b-0 relative",
                   idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
                 )}
               >
-                {/* Espacio info */}
-                <div className="w-48 shrink-0 p-4 border-r border-gray-200 flex flex-col justify-center bg-gradient-to-r from-emerald-500/5 to-transparent">
+                {/* Espacio info - Columna izquierda fija */}
+                <div className="w-48 shrink-0 p-4 border-r border-gray-200 flex flex-col justify-center bg-gradient-to-r from-emerald-500/5 to-transparent sticky left-0 z-20 shadow-[2px_0_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: idx % 2 === 0 ? 'white' : 'rgb(249 250 251 / 0.5)' }}>
                   <div className="font-semibold text-emerald-400">{space.name}</div>
                   {space.description && (
                     <div className="text-[10px] text-gray-400 mt-1 line-clamp-1">{space.description}</div>
