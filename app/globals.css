@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Leaflet CSS */
+@import 'leaflet/dist/leaflet.css';
+
+/* 
+  Paleta de colores inspirada en cancha de pádel profesional:
+  - Azul cancha: #0a4d8c (primario)
+  - Negro cristales: #0a0a0f
+  - Blanco líneas: #ffffff
+  - Amarillo pelota: #ccff00 (secundario/acento)
+*/
+
+@layer base {
+  :root {
+    /* Modo claro - usamos azul cancha como base */
+    --background: 210 20% 98%;
+    --foreground: 215 25% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 10%;
+    --primary: 207 85% 30%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 66 100% 50%;
+    --secondary-foreground: 215 25% 10%;
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 15% 45%;
+    --accent: 66 100% 50%;
+    --accent-foreground: 215 25% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 20% 88%;
+    --input: 210 20% 88%;
+    --ring: 207 85% 30%;
+    --radius: 0.75rem;
+    
+    /* Custom padel colors */
+    --padel-court: 207 85% 30%;
+    --padel-court-light: 207 75% 45%;
+    --padel-dark: 230 30% 8%;
+    --padel-ball: 66 100% 50%;
+    --padel-ball-glow: 66 100% 60%;
+    --padel-line: 0 0% 100%;
+  }
+
+  .dark {
+    /* Modo oscuro - negro de los cristales como fondo */
+    --background: 230 30% 6%;
+    --foreground: 210 20% 95%;
+    --card: 230 25% 10%;
+    --card-foreground: 210 20% 95%;
+    --popover: 230 25% 10%;
+    --popover-foreground: 210 20% 95%;
+    --primary: 207 80% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 66 100% 50%;
+    --secondary-foreground: 230 30% 8%;
+    --muted: 230 20% 15%;
+    --muted-foreground: 210 15% 60%;
+    --accent: 66 100% 50%;
+    --accent-foreground: 230 30% 8%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 230 20% 18%;
+    --input: 230 20% 18%;
+    --ring: 207 80% 50%;
+    
+    /* Custom padel colors dark */
+    --padel-court: 207 80% 50%;
+    --padel-court-light: 207 70% 60%;
+    --padel-dark: 230 30% 6%;
+    --padel-ball: 66 100% 50%;
+    --padel-ball-glow: 66 100% 65%;
+    --padel-line: 0 0% 100%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Utilidades custom para pádel */
+@layer utilities {
+  .bg-padel-court {
+    background-color: hsl(var(--padel-court));
+  }
+  .bg-padel-dark {
+    background-color: hsl(var(--padel-dark));
+  }
+  .bg-padel-ball {
+    background-color: hsl(var(--padel-ball));
+  }
+  .text-padel-ball {
+    color: hsl(var(--padel-ball));
+  }
+  .border-padel-court {
+    border-color: hsl(var(--padel-court));
+  }
+  .shadow-padel-ball {
+    box-shadow: 0 0 20px hsl(var(--padel-ball) / 0.4);
+  }
+}
+
+/* Animaciones de pádel */
+@keyframes swing {
+  0%, 100% {
+    transform: rotate(-15deg);
+  }
+  50% {
+    transform: rotate(15deg);
+  }
+}
+
+@keyframes hit {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(-10px) translateY(-5px);
+  }
+  50% {
+    transform: translateX(5px) translateY(10px);
+  }
+  75% {
+    transform: translateX(-5px) translateY(5px);
+  }
+}
+
+@keyframes ballBounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  30% {
+    transform: translateY(-20px) scale(0.95);
+  }
+  50% {
+    transform: translateY(-25px) scale(0.9);
+  }
+  70% {
+    transform: translateY(-15px) scale(0.95);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
