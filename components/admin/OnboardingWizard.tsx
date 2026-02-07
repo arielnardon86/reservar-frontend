@@ -116,6 +116,16 @@ function toEndOption(v: string) {
   return END_HOUR_OPTIONS_24.some((o) => o.value === v) ? v : "23:00"
 }
 
+/** Suma minutos a una hora "HH:mm" y retorna "HH:mm" (puede pasar a día siguiente, ej. 23:00 + 240 min = 03:00) */
+function addMinutesToTime(timeStr: string, minutesToAdd: number): string {
+  const [h, m] = timeStr.split(":").map(Number)
+  let totalMins = h * 60 + m + minutesToAdd
+  if (totalMins < 0) totalMins += 24 * 60
+  const newH = Math.floor(totalMins / 60) % 24
+  const newM = totalMins % 60
+  return `${newH.toString().padStart(2, "0")}:${newM.toString().padStart(2, "0")}`
+}
+
 /** Normaliza un día del schedule: si viene con formato viejo { start, end, enabled } sin turnos, lo convierte a { enabled, turnos }. */
 function normalizeDaySchedule(day: unknown, key: string): DaySchedule {
   if (day && typeof day === "object" && "turnos" in day && Array.isArray((day as DaySchedule).turnos)) {
@@ -142,6 +152,7 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
   const [createdTenantSlug, setCreatedTenantSlug] = useState<string | null>(null)
   const [password, setPassword] = useState("")
   const [passwordConfirm, setPasswordConfirm] = useState("")
+  const [applyToAllDays, setApplyToAllDays] = useState(false)
   const [data, setData] = useState<OnboardingData>({
     businessName: "",
     email: "",
@@ -202,43 +213,75 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
     })
   }
 
+  const maxSpaceDuration = Math.max(60, ...data.spaces.map((s) => s.duration))
+
   const addTurno = (dayKey: string) => {
+    const defaultStart = "14:00"
+    const defaultEnd = addMinutesToTime(defaultStart, maxSpaceDuration)
     const day = normalizeDaySchedule(data.schedule[dayKey], dayKey)
-    updateData({
-      schedule: {
-        ...data.schedule,
-        [dayKey]: {
-          enabled: day.enabled,
-          turnos: [...day.turnos, { start: "14:00", end: "19:00" }],
+    const newTurno = { start: defaultStart, end: defaultEnd }
+    if (dayKey === "all") {
+      const next = Object.fromEntries(
+        DAY_KEYS.map((k) => [
+          k,
+          { enabled: day.enabled, turnos: [...day.turnos, newTurno] },
+        ])
+      ) as OnboardingData["schedule"]
+      updateData({ schedule: { ...data.schedule, ...next } })
+    } else {
+      updateData({
+        schedule: {
+          ...data.schedule,
+          [dayKey]: { enabled: day.enabled, turnos: [...day.turnos, newTurno] },
         },
-      },
-    })
+      })
+    }
   }
 
   const removeTurno = (dayKey: string, turnoIndex: number) => {
-    const day = normalizeDaySchedule(data.schedule[dayKey], dayKey)
+    const key = dayKey === "all" ? "monday" : dayKey
+    const day = normalizeDaySchedule(data.schedule[key], key)
     const turnos = day.turnos.filter((_, i) => i !== turnoIndex)
-    updateData({
-      schedule: {
-        ...data.schedule,
-        [dayKey]: {
-          enabled: day.enabled,
-          turnos: turnos.length ? turnos : [{ start: "08:00", end: "23:00" }],
+    const fallback = [{ start: "08:00", end: addMinutesToTime("08:00", maxSpaceDuration) }]
+    const finalTurnos = turnos.length ? turnos : fallback
+    if (dayKey === "all") {
+      const next = Object.fromEntries(
+        DAY_KEYS.map((k) => [k, { enabled: day.enabled, turnos: finalTurnos }])
+      ) as OnboardingData["schedule"]
+      updateData({ schedule: { ...data.schedule, ...next } })
+    } else {
+      updateData({
+        schedule: {
+          ...data.schedule,
+          [dayKey]: { enabled: day.enabled, turnos: finalTurnos },
         },
-      },
-    })
+      })
+    }
   }
 
   const updateTurno = (dayKey: string, turnoIndex: number, updates: { start?: string; end?: string }) => {
-    const day = normalizeDaySchedule(data.schedule[dayKey], dayKey)
+    const key = dayKey === "all" ? "monday" : dayKey
+    const day = normalizeDaySchedule(data.schedule[key], key)
     const turnos = [...day.turnos]
-    turnos[turnoIndex] = { ...turnos[turnoIndex], ...updates }
-    updateData({
-      schedule: {
-        ...data.schedule,
-        [dayKey]: { enabled: day.enabled, turnos },
-      },
-    })
+    const current = turnos[turnoIndex]
+    let next = { ...current, ...updates }
+    if (updates.start != null) {
+      next.end = addMinutesToTime(updates.start, maxSpaceDuration)
+    }
+    turnos[turnoIndex] = next
+    if (dayKey === "all") {
+      const nextSchedule = Object.fromEntries(
+        DAY_KEYS.map((k) => [k, { enabled: day.enabled, turnos }])
+      ) as OnboardingData["schedule"]
+      updateData({ schedule: { ...data.schedule, ...nextSchedule } })
+    } else {
+      updateData({
+        schedule: {
+          ...data.schedule,
+          [dayKey]: { enabled: day.enabled, turnos },
+        },
+      })
+    }
   }
 
   const handleComplete = async () => {
@@ -623,7 +666,7 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold text-slate-900">Horarios de los espacios</h2>
-                    <p className="text-sm text-gray-500">Apertura y cierre por día en <strong>formato 24 h</strong>. Podés definir hasta dos turnos por día (ej. mañana y tarde). Se aplica a todos los espacios.</p>
+                    <p className="text-sm text-gray-500">Apertura y cierre por día en <strong>formato 24 h</strong>. Podés definir todos los turnos que necesites por día. Se aplica a todos los espacios.</p>
                   </div>
                 </div>
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 space-y-1">
@@ -634,18 +677,44 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
                   <span>Formato 24 h</span>
                   <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">00:00 – 23:59</span>
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer mt-4 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={applyToAllDays}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      setApplyToAllDays(checked)
+                      if (checked) {
+                        const monday = normalizeDaySchedule(data.schedule.monday, "monday")
+                        const next = Object.fromEntries(
+                          DAY_KEYS.map((k) => [k, { enabled: monday.enabled, turnos: [...monday.turnos] }])
+                        ) as OnboardingData["schedule"]
+                        updateData({ schedule: { ...data.schedule, ...next } })
+                      }
+                    }}
+                    className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-sm text-gray-700">Aplicar mismo horario y turnos a todos los días</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  El cierre se calcula automáticamente según la duración configurada de los espacios (ej. apertura 11:00 + 4h = cierre 15:00).
+                </p>
                 <div className="space-y-3">
-                  {Object.entries({
-                    monday: "Lunes",
-                    tuesday: "Martes",
-                    wednesday: "Miércoles",
-                    thursday: "Jueves",
-                    friday: "Viernes",
-                    saturday: "Sábado",
-                    sunday: "Domingo",
-                  }).map(([key, label]) => {
-                    const day = normalizeDaySchedule(data.schedule[key], key)
-                    const turnos = day.turnos.length ? day.turnos : [{ start: "08:00", end: "23:00" }]
+                  {(applyToAllDays
+                    ? [["all", "Todos los días"]] as [string, string][]
+                    : Object.entries({
+                        monday: "Lunes",
+                        tuesday: "Martes",
+                        wednesday: "Miércoles",
+                        thursday: "Jueves",
+                        friday: "Viernes",
+                        saturday: "Sábado",
+                        sunday: "Domingo",
+                      })
+                  ).map(([key, label]) => {
+                    const scheduleKey = key === "all" ? "monday" : key
+                    const day = normalizeDaySchedule(data.schedule[scheduleKey], scheduleKey)
+                    const turnos = day.turnos.length ? day.turnos : [{ start: "08:00", end: addMinutesToTime("08:00", maxSpaceDuration) }]
                     return (
                       <div key={key} className="p-4 border border-gray-200 rounded-xl bg-white space-y-3">
                         <div className="flex items-center gap-4">
@@ -656,13 +725,18 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
                             variant={day.enabled ? "default" : "outline"}
                             size="sm"
                             onClick={() => {
-                              const next = normalizeDaySchedule(data.schedule[key], key)
-                              updateData({
-                                schedule: {
-                                  ...data.schedule,
-                                  [key]: { ...next, enabled: !next.enabled },
-                                },
-                              })
+                              const next = normalizeDaySchedule(data.schedule[scheduleKey], scheduleKey)
+                              const toggle = { ...next, enabled: !next.enabled }
+                              if (key === "all") {
+                                const updated = Object.fromEntries(
+                                  DAY_KEYS.map((k) => [k, toggle])
+                                ) as OnboardingData["schedule"]
+                                updateData({ schedule: { ...data.schedule, ...updated } })
+                              } else {
+                                updateData({
+                                  schedule: { ...data.schedule, [key]: toggle },
+                                })
+                              }
                             }}
                             className={day.enabled
                               ? "bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl"
@@ -677,7 +751,7 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
                             {turnos.map((turno, idx) => (
                               <div key={idx} className="flex items-center gap-2 flex-wrap gap-y-2">
                                 <span className="text-xs font-medium text-gray-500 w-16 shrink-0">
-                                  {turnos.length > 1 ? (idx === 0 ? "Turno 1" : "Turno 2") : "Horario"}
+                                  {turnos.length > 1 ? `Turno ${idx + 1}` : "Horario"}
                                 </span>
                                 <select
                                   value={toStartOption(turno.start)}
@@ -713,18 +787,16 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
                                 )}
                               </div>
                             ))}
-                            {turnos.length < 2 && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addTurno(key)}
-                                className="border-2 border-dashed border-emerald-400 text-emerald-600 hover:bg-emerald-50 font-medium"
-                              >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Agregar segundo turno
-                              </Button>
-                            )}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addTurno(key)}
+                              className="border-2 border-dashed border-emerald-400 text-emerald-600 hover:bg-emerald-50 font-medium"
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Agregar turno
+                            </Button>
                           </div>
                         )}
                       </div>
