@@ -16,6 +16,7 @@ export interface ApiError {
 class ApiClient {
   private baseUrl: string;
   private tenantId: string | null = null;
+  private authToken: string | null = null;
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
@@ -23,6 +24,10 @@ class ApiClient {
 
   setTenantId(tenantId: string | null) {
     this.tenantId = tenantId;
+  }
+
+  setAuthToken(token: string | null) {
+    this.authToken = token;
   }
 
   private async request<T>(
@@ -54,12 +59,18 @@ class ApiClient {
       ...options.headers,
     };
 
+    // Agregar JWT si está disponible (para super admin)
+    if (this.authToken) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.authToken}`;
+    }
+
     // Agregar tenant ID si está disponible
-    // Los endpoints públicos (como /tenants/slug/:slug) no requieren tenantId
+    // Los endpoints públicos y super-admin no requieren tenantId
     const isPublicEndpoint = endpoint.includes('/tenants/slug/') || 
                              endpoint.includes('/tenants?') ||
                              endpoint === '/tenants' && options.method === 'GET' ||
-                             endpoint.includes('/auth/');
+                             endpoint.includes('/auth/') ||
+                             endpoint.includes('/super-admin/');
     
     if (this.tenantId) {
       (headers as Record<string, string>)['x-tenant-id'] = this.tenantId;

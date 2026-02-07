@@ -8,6 +8,7 @@ import { AppointmentsManager } from "./AppointmentsManager"
 import { ServicesManager } from "./ServicesManager"
 import { SettingsPanel } from "./SettingsPanel"
 import { SchedulesManager } from "./SchedulesManager"
+import { SuperAdminDashboard } from "./SuperAdminDashboard"
 import { TenantProvider, useTenantContext } from "@/lib/context/TenantContext"
 import { useAuth } from "@/lib/context/AuthContext"
 import {
@@ -201,7 +202,12 @@ function AdminDashboardContent() {
 export function AdminDashboard() {
   const searchParams = useSearchParams()
   const { user } = useAuth()
-  
+
+  // Super admin ve solo Métricas y Configuración
+  if (user?.isSuperAdmin) {
+    return <SuperAdminDashboard />
+  }
+
   // Usar tenantId del usuario autenticado o del URL
   const tenantIdFromUrl = searchParams?.get('tenantId')
   const tenantId = user?.tenantId || tenantIdFromUrl

@@ -136,6 +136,21 @@ export const appointmentsApi = {
 };
 
 // ============================================
+// SUPER ADMIN (requiere JWT)
+// ============================================
+
+export const superAdminApi = {
+  getStats: () => apiClient.get<any>('/super-admin/stats'),
+  getTenants: () => apiClient.get<any[]>('/super-admin/tenants'),
+  getTenantById: (id: string) => apiClient.get<any>(`/super-admin/tenants/${id}`),
+  activateTenant: (id: string) => apiClient.patch<any>(`/super-admin/tenants/${id}/activate`),
+  deactivateTenant: (id: string) => apiClient.patch<any>(`/super-admin/tenants/${id}/deactivate`),
+  deleteTenant: (id: string) => apiClient.delete<any>(`/super-admin/tenants/${id}`),
+  resetTenantPasswords: (tenantId: string) =>
+    apiClient.post<any>(`/super-admin/tenants/${tenantId}/reset-passwords`, {}),
+};
+
+// ============================================
 // AUTH
 // ============================================
 

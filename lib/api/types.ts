@@ -284,11 +284,13 @@ export interface VerifyTokenDto {
 }
 
 export interface AuthResponse {
+  access_token?: string;
   user: {
     id: string;
     email: string;
     name?: string;
     tenantId: string;
+    isSuperAdmin?: boolean;
     tenant?: Tenant;
   };
   jwt?: string;

@@ -9,6 +9,7 @@ export interface AuthUser {
   email: string
   name?: string
   tenantId: string
+  isSuperAdmin?: boolean
   tenant?: {
     id: string
     name: string
@@ -18,10 +19,12 @@ export interface AuthUser {
 
 interface AuthContextType {
   user: AuthUser | null
+  accessToken: string | null
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   setUser: (user: AuthUser | null) => void
+  setAccessToken: (token: string | null) => void
   isAuthenticated: boolean
 }
 
@@ -32,31 +35,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
-  // Cargar usuario desde localStorage al montar
+  const [accessToken, setAccessTokenState] = useState<string | null>(null)
+
+  const setAccessToken = (token: string | null) => {
+    setAccessTokenState(token)
+    if (token) {
+      localStorage.setItem('auth_token', token)
+    } else {
+      localStorage.removeItem('auth_token')
+    }
+  }
+
+  // Cargar usuario y token desde localStorage al montar
   useEffect(() => {
-    const loadUser = () => {
+    const loadAuth = () => {
       try {
         if (typeof window !== 'undefined') {
           const storedUser = localStorage.getItem('auth_user')
-          if (storedUser) {
-            setUser(JSON.parse(storedUser))
-          }
+          const storedToken = localStorage.getItem('auth_token')
+          if (storedUser) setUser(JSON.parse(storedUser))
+          if (storedToken) setAccessTokenState(storedToken)
         }
       } catch (error) {
-        console.error('Error loading user from storage:', error)
+        console.error('Error loading auth from storage:', error)
         localStorage.removeItem('auth_user')
+        localStorage.removeItem('auth_token')
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadUser()
+    loadAuth()
   }, [])
 
   const login = async (email: string, password: string) => {
     const data = await authApi.login({ email, password })
     if (data.user) {
       setUser(data.user as AuthUser)
+      if ((data as any).access_token) {
+        setAccessToken((data as any).access_token)
+      }
       router.push('/admin/dashboard')
     }
   }
@@ -64,7 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null)
+    setAccessTokenState(null)
     localStorage.removeItem('auth_user')
+    localStorage.removeItem('auth_token')
     router.push('/login')
   }
 
@@ -81,10 +101,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        accessToken,
         isLoading,
         login,
         logout,
         setUser: setUserState,
+        setAccessToken,
         isAuthenticated: !!user,
       }}
     >
