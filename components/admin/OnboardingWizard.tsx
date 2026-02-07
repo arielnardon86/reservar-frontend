@@ -41,6 +41,7 @@ type OnboardingStep =
 interface Space {
   id: string
   name: string
+  description?: string
   duration: number
   price?: number
 }
@@ -145,9 +146,9 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
     businessName: "",
     email: "",
     spaces: [
-      { id: generateId(), name: "SUM", duration: 120 },
-      { id: generateId(), name: "Gimnasio", duration: 60 },
-      { id: generateId(), name: "Parrilla 1", duration: 180 },
+      { id: generateId(), name: "SUM", description: "", duration: 120 },
+      { id: generateId(), name: "Gimnasio", description: "", duration: 60 },
+      { id: generateId(), name: "Parrilla 1", description: "", duration: 180 },
     ],
     schedule: defaultSchedule(),
   })
@@ -182,7 +183,7 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
     updateData({
       spaces: [
         ...data.spaces,
-        { id: generateId(), name: `Espacio ${num}`, duration: 120 }
+        { id: generateId(), name: `Espacio ${num}`, description: "", duration: 120 }
       ]
     })
   }
@@ -291,6 +292,7 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
       for (const space of data.spaces) {
         const service = await createService.mutateAsync({
           name: space.name,
+          description: space.description || undefined,
           duration: space.duration,
           price: space.price,
         })
@@ -572,6 +574,15 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
                             className="mt-1 border-gray-300 focus:border-emerald-500"
                           />
                         </div>
+                      </div>
+                      <div className="mt-3">
+                        <Label className="text-xs text-gray-500">Descripción - opcional</Label>
+                        <Input
+                          value={space.description ?? ''}
+                          onChange={(e) => updateSpace(space.id, { description: e.target.value })}
+                          placeholder="Ej: Salón de usos múltiples con aire acondicionado"
+                          className="mt-1 border-gray-300 focus:border-emerald-500"
+                        />
                       </div>
                     </div>
                   ))}
