@@ -167,8 +167,8 @@ export function QuickBooking() {
     const loadAllAvailability = async () => {
       if (!activeSpaces.length || !tenantSlug) return
       setLoadingAvailability(true)
-      const newMap = new Map<string, boolean>()
       const dateStr = format(selectedDate, 'yyyy-MM-dd')
+      const newMap = new Map<string, boolean>()
       try {
         const promises = activeSpaces.map(async (space) => {
           try {
@@ -193,6 +193,7 @@ export function QuickBooking() {
         setAvailabilityMap(newMap)
       } catch (error) {
         console.error("Error disponibilidad:", error)
+        setAvailabilityMap(new Map())
       } finally {
         setLoadingAvailability(false)
       }
@@ -212,15 +213,17 @@ export function QuickBooking() {
     return slotEnd.getTime() <= now.getTime()
   }
 
-  // Disponibilidad por franja exacta (HH:mm); el backend solo devuelve slots dentro de horarios abiertos
+  // Disponibilidad por franja exacta (HH:mm). El backend devuelve horas en hora local del edificio.
   const isSlotTimeInMapAvailable = (spaceId: string, timeLocal: string): boolean => {
+    const keyLocal = `${spaceId}-${timeLocal}`
+    const vLocal = availabilityMap.get(keyLocal)
+    if (vLocal !== undefined) return vLocal === true
     const [h, m] = timeLocal.split(':').map(Number)
     const d = new Date(selectedDate)
     d.setHours(h, m, 0, 0)
     const timeUTC = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-    const v = availabilityMap.get(`${spaceId}-${timeUTC}`)
-    if (v !== undefined) return v === true
-    return availabilityMap.get(`${spaceId}-${timeLocal}`) === true
+    const vUTC = availabilityMap.get(`${spaceId}-${timeUTC}`)
+    return vUTC === true
   }
 
   // Bloques ocupados por reservas (debe estar antes de getAvailableBlocks que lo usa)
