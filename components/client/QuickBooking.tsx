@@ -200,21 +200,16 @@ export function QuickBooking() {
     loadAllAvailability()
   }, [activeSpaces, selectedDate, tenantSlug])
 
+  // Un slot (30 min) está en el pasado solo si su FIN es anterior a ahora → permite reservar dentro del bloque ya iniciado
   const isSlotInPast = (slotIndex: number): boolean => {
     if (!isSameDay(selectedDate, new Date())) return false
     const time = slotToTime(slotIndex)
     const [h, m] = time.split(':').map(Number)
-    
-    // slotToTime genera horas locales (8, 9, 10, ..., 23) que se muestran en la interfaz
-    // Estas horas son hora local, no UTC. Necesitamos comparar en hora local.
     const now = new Date()
-    const slotDate = new Date(selectedDate)
-    slotDate.setHours(h, m, 0, 0)
-    slotDate.setSeconds(0, 0)
-    
-    // Comparar en hora local
-    // Un slot está en el pasado si su hora local es menor que la hora actual local
-    return slotDate.getTime() < now.getTime()
+    const slotEnd = new Date(selectedDate)
+    slotEnd.setHours(h, m + SLOT_DURATION, 0, 0)
+    slotEnd.setSeconds(0, 0)
+    return slotEnd.getTime() <= now.getTime()
   }
 
   // Disponibilidad por franja exacta (HH:mm); el backend solo devuelve slots dentro de horarios abiertos
