@@ -311,27 +311,36 @@ export function QuickBooking() {
       ranges.push(currentRange)
     }
     
-    // Para cada franja, generar bloques de la duración del espacio
+    // Para cada franja: bloques de duración completa O bloque parcial (reserva dentro de turno ya empezado)
     for (const range of ranges) {
       const rangeLength = range.end - range.start
-      if (rangeLength < durationSlots) continue // La franja es más corta que la duración requerida
-      
-      // Generar bloques dentro de esta franja, empezando desde el inicio
-      for (let startSlot = range.start; startSlot + durationSlots <= range.end; startSlot += durationSlots) {
-        const endSlot = startSlot + durationSlots
-        
-        // Verificar que todos los slots del bloque estén disponibles y no reservados
-        const allAvailable = Array.from({ length: durationSlots }, (_, i) => startSlot + i).every(
+      if (rangeLength < 1) continue
+
+      // Bloques de duración completa (ej. 4h)
+      if (rangeLength >= durationSlots) {
+        for (let startSlot = range.start; startSlot + durationSlots <= range.end; startSlot += durationSlots) {
+          const endSlot = startSlot + durationSlots
+          const allAvailable = Array.from({ length: durationSlots }, (_, i) => startSlot + i).every(
+            slotIdx => {
+              const timeStr = slotToTime(slotIdx)
+              return isSlotTimeInMapAvailable(space.id, timeStr) &&
+                     !reserved.some(r => slotIdx >= r.startSlot && slotIdx < r.endSlot)
+            }
+          )
+          if (allAvailable) blocks.push({ startSlot, endSlot })
+        }
+      }
+
+      // Bloque parcial: tiempo restante del turno (ej. son las 12, turno 11-15 → 12:00 a 15:00)
+      if (rangeLength < durationSlots && rangeLength >= 1) {
+        const allAvailable = Array.from({ length: rangeLength }, (_, i) => range.start + i).every(
           slotIdx => {
             const timeStr = slotToTime(slotIdx)
-            return isSlotTimeInMapAvailable(space.id, timeStr) && 
+            return isSlotTimeInMapAvailable(space.id, timeStr) &&
                    !reserved.some(r => slotIdx >= r.startSlot && slotIdx < r.endSlot)
           }
         )
-        
-        if (allAvailable) {
-          blocks.push({ startSlot, endSlot })
-        }
+        if (allAvailable) blocks.push({ startSlot: range.start, endSlot: range.end })
       }
     }
     
@@ -366,9 +375,10 @@ export function QuickBooking() {
     const block = getAvailableBlocksCached(space).find(b => b.startSlot === startSlot)
     if (!block) return []
     const endTime = slotToTime(block.endSlot)
-    const label = space.duration === 60 ? "1 hora" : space.duration === 90 ? "1h 30m" : `${space.duration / 60} horas`
+    const blockMinutes = (block.endSlot - block.startSlot) * SLOT_DURATION
+    const label = blockMinutes === 60 ? "1 hora" : blockMinutes === 90 ? "1h 30m" : `${blockMinutes / 60} horas`
     return [{
-      minutes: space.duration,
+      minutes: blockMinutes,
       label,
       endTime,
       available: true,
@@ -417,12 +427,15 @@ export function QuickBooking() {
 
     setIsBooking(true)
     try {
-      // Usar fecha/hora local del navegador (no UTC) para evitar problemas de timezone
-      const [hours, minutes] = selectedSlot.startTime.split(':').map(Number)
       const dateStr = format(selectedSlot.date, 'yyyy-MM-dd')
       const [year, month, day] = dateStr.split('-').map(Number)
-      // Crear fecha local (no UTC) para que coincida con lo que ve el usuario
-      const startTime = new Date(year, month - 1, day, hours, minutes, 0, 0)
+      const [startH, startM] = selectedSlot.startTime.split(':').map(Number)
+      const [endH, endM] = selectedSlot.endTime.split(':').map(Number)
+      const startTime = new Date(year, month - 1, day, startH, startM, 0, 0)
+      let endTime = new Date(year, month - 1, day, endH, endM, 0, 0)
+      if (endTime.getTime() <= startTime.getTime()) {
+        endTime = new Date(year, month - 1, day + 1, endH, endM, 0, 0)
+      }
 
       const appointment = await appointmentsApi.createPublic(tenantSlug, {
         customerFirstName: bookingForm.name,
@@ -430,6 +443,7 @@ export function QuickBooking() {
         customerEmail: bookingForm.email,
         serviceId: selectedSlot.space.id,
         startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
         status: 'CONFIRMED' as AppointmentStatus,
         departamento: bookingForm.departamento,
         piso: bookingForm.piso,
@@ -453,7 +467,7 @@ export function QuickBooking() {
       setBookingSuccess(true)
       toast.success("¡Reserva confirmada!")
       
-      // Marcar como no disponibles los slots reservados (claves en UTC como devuelve el backend)
+      // Marcar como no disponibles los slots reservados (claves en hora local, como devuelve el backend)
       setAvailabilityMap(prev => {
         const newMap = new Map(prev)
         const spaceId = selectedSlot.space.id
@@ -464,10 +478,8 @@ export function QuickBooking() {
         for (let min = startMins; min < endMins; min += SLOT_DURATION) {
           const h = Math.floor(min / 60) % 24
           const m = min % 60
-          const d = new Date(selectedSlot.date)
-          d.setHours(h, m, 0, 0)
-          const utc = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-          newMap.set(`${spaceId}-${utc}`, false)
+          const t = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+          newMap.set(`${spaceId}-${t}`, false)
         }
         return newMap
       })

@@ -244,6 +244,7 @@ export interface CreateAppointmentDto {
   serviceId: string;   // Espacio común (obligatorio)
   professionalId?: string; // Opcional (edificios/condominios solo usan serviceId)
   startTime: string;   // ISO string
+  endTime?: string;    // ISO string (opcional; si se envía, se usa en lugar de startTime + duración del espacio)
   status?: AppointmentStatus;
   notes?: string;
   departamento?: string;  // Depto (edificios)
