@@ -27,6 +27,21 @@ const DAYS_OF_WEEK = [
   { value: 0, label: "Domingo", short: "Dom" },
 ]
 
+// Misma UI que onboarding: formato 24 h, opciones cada 30 min
+const HOUR_OPTIONS_24: { value: string; label: string }[] = []
+for (let h = 0; h < 24; h++) {
+  const hh = h.toString().padStart(2, "0")
+  HOUR_OPTIONS_24.push({ value: `${hh}:00`, label: `${hh}:00` })
+  HOUR_OPTIONS_24.push({ value: `${hh}:30`, label: `${hh}:30` })
+}
+const END_HOUR_OPTIONS_24 = [...HOUR_OPTIONS_24, { value: "23:59", label: "23:59" }]
+function toStartOption(v: string) {
+  return HOUR_OPTIONS_24.some((o) => o.value === v) ? v : "08:00"
+}
+function toEndOption(v: string) {
+  return END_HOUR_OPTIONS_24.some((o) => o.value === v) ? v : "23:00"
+}
+
 export function SchedulesManager() {
   const { data: schedules, isLoading } = useSchedules()
   const { data: courts } = useProfessionals()
@@ -46,9 +61,9 @@ export function SchedulesManager() {
     isException: false,
   })
   const [turnos, setTurnos] = useState<{ start: string; end: string }[]>([{ start: "08:00", end: "23:00" }])
+  const [applyToAllDays, setApplyToAllDays] = useState(false)
 
   const addTurno = () => {
-    if (turnos.length >= 2) return
     setTurnos([...turnos, { start: "14:00", end: "19:00" }])
   }
   const removeTurno = (index: number) => {
@@ -67,14 +82,20 @@ export function SchedulesManager() {
     }
 
     try {
-      for (const turno of turnos) {
-        await createSchedule.mutateAsync({
-          ...formData,
-          startTime: turno.start,
-          endTime: turno.end,
-        })
+      const daysToCreate = applyToAllDays ? [0, 1, 2, 3, 4, 5, 6] : [formData.dayOfWeek]
+      let created = 0
+      for (const dayOfWeek of daysToCreate) {
+        for (const turno of turnos) {
+          await createSchedule.mutateAsync({
+            ...formData,
+            dayOfWeek,
+            startTime: turno.start,
+            endTime: turno.end,
+          })
+          created++
+        }
       }
-      toast.success(turnos.length > 1 ? `Se crearon ${turnos.length} horarios` : 'Horario creado')
+      toast.success(created > 1 ? `Se crearon ${created} horarios` : 'Horario creado')
       setFormData({
         serviceId: undefined,
         professionalId: undefined,
@@ -84,6 +105,7 @@ export function SchedulesManager() {
         isException: false,
       })
       setTurnos([{ start: "08:00", end: "23:00" }])
+      setApplyToAllDays(false)
       setIsCreating(false)
     } catch (error: any) {
       toast.error(error?.message || 'Error al crear horario')
@@ -126,43 +148,65 @@ export function SchedulesManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-white">🕐 Horarios</h2>
-          <p className="text-slate-400">Configura los horarios de apertura para reservas</p>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+          <Clock className="w-5 h-5 text-emerald-600" />
         </div>
-        {!isCreating && (
+        <div>
+          <h2 className="text-2xl font-bold text-white">Horarios de los espacios</h2>
+          <p className="text-slate-400 text-sm">Apertura y cierre por día en formato 24 h. Podés definir todos los turnos que necesites por día.</p>
+        </div>
+      </div>
+      {!isCreating && (
+        <div className="flex justify-end">
           <Button 
-            className="gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold" 
+            className="gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl" 
             onClick={() => setIsCreating(true)}
           >
             <Plus className="w-4 h-4" />
-            Nuevo Horario
+            Nuevo horario
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Formulario de creación */}
+      {/* Formulario de creación - misma UI que onboarding */}
       {isCreating && (
-        <Card className="border-2 border-emerald-500/30 bg-slate-900/50">
+        <Card className="border-2 border-emerald-500/30 bg-slate-900/50 rounded-xl">
           <CardHeader>
             <div className="flex justify-between items-center">
-              <CardTitle className="text-white">🕐 Nuevo Horario</CardTitle>
+              <CardTitle className="text-white">Nuevo horario</CardTitle>
               <Button variant="ghost" size="icon" onClick={() => setIsCreating(false)} className="text-white/60 hover:text-white">
                 <X className="w-4 h-4" />
               </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-lg border border-amber-200/50 bg-amber-500/10 px-3 py-2 space-y-1">
+              <p className="text-xs font-medium text-amber-200">Cierre a la madrugada</p>
+              <p className="text-xs text-slate-400">Si el cierre es anterior a la apertura (ej. apertura 22:00, cierre 02:00), se considera abierto hasta la madrugada del día siguiente.</p>
+            </div>
+            <div className="flex items-center justify-end gap-2 text-xs text-slate-500">
+              <span>Formato 24 h</span>
+              <span className="font-mono bg-slate-800 px-1.5 py-0.5 rounded">00:00 – 23:59</span>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={applyToAllDays}
+                onChange={(e) => setApplyToAllDays(e.target.checked)}
+                className="rounded border-slate-600 text-emerald-600 focus:ring-emerald-500 bg-slate-800"
+              />
+              <span className="text-sm text-slate-300">Aplicar mismo horario y turnos a todos los días</span>
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="text-slate-300">Espacio común (opcional)</Label>
                 <select
                   value={formData.serviceId || ''}
                   onChange={(e) => setFormData({ ...formData, serviceId: e.target.value || undefined, professionalId: undefined })}
-                  className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
+                  className="mt-2 w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-md text-white focus:border-emerald-500"
                 >
-                  <option value="">Global</option>
+                  <option value="">Global (todos los espacios)</option>
                   {spaces?.filter(s => s.isActive).map((space) => (
                     <option key={space.id} value={space.id}>{space.name}</option>
                   ))}
@@ -173,7 +217,7 @@ export function SchedulesManager() {
                 <select
                   value={formData.professionalId || ''}
                   onChange={(e) => setFormData({ ...formData, professionalId: e.target.value || undefined, serviceId: undefined })}
-                  className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
+                  className="mt-2 w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-md text-white focus:border-emerald-500"
                 >
                   <option value="">Ninguno</option>
                   {courts?.filter(c => c.isActive).map((court) => (
@@ -182,59 +226,63 @@ export function SchedulesManager() {
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            {!applyToAllDays && (
               <div>
                 <Label className="text-slate-300">Día *</Label>
                 <select
                   value={formData.dayOfWeek}
                   onChange={(e) => setFormData({ ...formData, dayOfWeek: parseInt(e.target.value) })}
-                  className="mt-2 w-full h-10 px-3 bg-[#1a1a2e] border border-slate-700 rounded-md text-white"
+                  className="mt-2 w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-md text-white focus:border-emerald-500"
                 >
                   {DAYS_OF_WEEK.map((day) => (
-                    <option key={day.value} value={day.value}>
-                      {day.label}
-                    </option>
+                    <option key={day.value} value={day.value}>{day.label}</option>
                   ))}
                 </select>
               </div>
-            </div>
+            )}
             <div className="space-y-3">
-              <Label className="text-slate-300">Turnos (hasta 2 por día, formato 24h)</Label>
+              <Label className="text-slate-300">Turnos (formato 24 h)</Label>
               {turnos.map((turno, idx) => (
-                <div key={idx} className="flex items-center gap-2 p-2 bg-slate-800/50 rounded-lg">
-                  <span className="text-xs text-slate-500 w-16">{turnos.length > 1 ? `Turno ${idx + 1}` : 'Horario'}</span>
-                  <Input
-                    type="time"
-                    value={turno.start}
+                <div key={idx} className="flex items-center gap-2 flex-wrap gap-y-2 p-2 bg-slate-800/50 rounded-lg">
+                  <span className="text-xs font-medium text-slate-500 w-16 shrink-0">
+                    {turnos.length > 1 ? `Turno ${idx + 1}` : 'Horario'}
+                  </span>
+                  <select
+                    value={toStartOption(turno.start)}
                     onChange={(e) => updateTurno(idx, 'start', e.target.value)}
-                    className="flex-1 bg-slate-800 border-slate-700 text-white h-9"
-                  />
-                  <span className="text-slate-500">a</span>
-                  <Input
-                    type="time"
-                    value={turno.end}
+                    className="h-10 rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white focus:border-emerald-500 w-24 font-mono"
+                  >
+                    {HOUR_OPTIONS_24.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                  <span className="text-slate-500 text-sm">a</span>
+                  <select
+                    value={toEndOption(turno.end)}
                     onChange={(e) => updateTurno(idx, 'end', e.target.value)}
-                    className="flex-1 bg-slate-800 border-slate-700 text-white h-9"
-                  />
+                    className="h-10 rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white focus:border-emerald-500 w-24 font-mono"
+                  >
+                    {END_HOUR_OPTIONS_24.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
                   {turnos.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:bg-red-500/20" onClick={() => removeTurno(idx)}>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeTurno(idx)} className="text-red-500 hover:text-red-400 hover:bg-red-500/20 h-9">
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   )}
                 </div>
               ))}
-              {turnos.length < 2 && (
-                <Button type="button" variant="outline" size="sm" onClick={addTurno} className="border-slate-700 text-slate-300">
-                  <Plus className="w-4 h-4 mr-1" />
-                  Agregar otro turno
-                </Button>
-              )}
+              <Button type="button" variant="outline" size="sm" onClick={addTurno} className="border-2 border-dashed border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-medium rounded-xl">
+                <Plus className="w-4 h-4 mr-2" />
+                Agregar turno
+              </Button>
             </div>
             <div className="flex gap-2">
               <Button 
                 onClick={handleCreate} 
                 disabled={createSchedule.isPending}
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl"
               >
                 {createSchedule.isPending ? (
                   <>
@@ -242,10 +290,10 @@ export function SchedulesManager() {
                     Creando...
                   </>
                 ) : (
-                  'Crear Horario'
+                  'Crear horario'
                 )}
               </Button>
-              <Button variant="outline" onClick={() => setIsCreating(false)} className="border-slate-700 text-slate-300">
+              <Button variant="outline" onClick={() => setIsCreating(false)} className="border-slate-700 text-slate-300 rounded-xl">
                 Cancelar
               </Button>
             </div>
@@ -400,25 +448,27 @@ export function SchedulesManager() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-slate-300">Apertura</Label>
-                  <Input
-                    type="time"
-                    value={formData.startTime}
-                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="mt-2 bg-slate-800 border-slate-700 text-white"
-                  />
-                </div>
-                <div>
-                  <Label className="text-slate-300">Cierre</Label>
-                  <Input
-                    type="time"
-                    value={formData.endTime}
-                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    className="mt-2 bg-slate-800 border-slate-700 text-white"
-                  />
-                </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-slate-300 w-16">Horario</Label>
+                <select
+                  value={toStartOption(formData.startTime)}
+                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                  className="h-10 rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white focus:border-emerald-500 w-24 font-mono"
+                >
+                  {HOUR_OPTIONS_24.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+                <span className="text-slate-500 text-sm">a</span>
+                <select
+                  value={toEndOption(formData.endTime)}
+                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                  className="h-10 rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white focus:border-emerald-500 w-24 font-mono"
+                >
+                  {END_HOUR_OPTIONS_24.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
               </div>
               <p className="text-xs text-slate-500">Para agregar más turnos al mismo día y espacio, guardá y luego creá un nuevo horario con el mismo día y espacio.</p>
               <div className="flex gap-2">

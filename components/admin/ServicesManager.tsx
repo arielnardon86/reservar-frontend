@@ -11,13 +11,13 @@ import {
   useUpdateService, 
   useDeleteService 
 } from "@/lib/api/hooks"
-import { Plus, Edit, Trash2, Clock, DollarSign, X, Loader2 } from "lucide-react"
+import { Plus, Edit, Trash2, Clock, DollarSign, X, Loader2, Building2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import type { CreateServiceDto, UpdateServiceDto } from "@/lib/api/types"
 
-// Duraciones de 1 a 24 horas (en minutos)
-const SPACE_DURATIONS = Array.from({ length: 24 }, (_, i) => {
+// Misma estructura que onboarding: duraciones 1 a 24 horas (en minutos)
+const DURATION_OPTIONS = Array.from({ length: 24 }, (_, i) => {
   const hours = i + 1
   return { value: hours * 60, label: hours === 1 ? '1 hora' : `${hours} horas` }
 })
@@ -100,100 +100,75 @@ export function ServicesManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-white">🏢 Espacios comunes</h2>
-          <p className="text-slate-400">SUM, Gimnasio, Parrillas y otros espacios reservables</p>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+          <Building2 className="w-5 h-5 text-emerald-600" />
         </div>
-        {!isCreating && (
-          <Button 
-            className="gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold" 
-            onClick={() => setIsCreating(true)}
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo espacio
-          </Button>
-        )}
+        <div>
+          <h2 className="text-2xl font-bold text-white">Espacios comunes</h2>
+          <p className="text-slate-400 text-sm">SUM, gimnasio, parrillas… Cada uno con su duración y precio opcional</p>
+        </div>
       </div>
 
-      {/* Formulario de creación */}
+      {/* Formulario de creación - misma UI que onboarding */}
       {isCreating && (
-        <Card className="border-2 border-emerald-500/30 bg-slate-900/50">
+        <Card className="border-2 border-emerald-500/30 bg-slate-900/50 rounded-xl">
           <CardHeader>
             <div className="flex justify-between items-center">
-              <CardTitle className="text-white">🏢 Nuevo espacio</CardTitle>
+              <CardTitle className="text-white">Nuevo espacio</CardTitle>
               <Button variant="ghost" size="icon" onClick={() => setIsCreating(false)} className="text-white/60 hover:text-white">
                 <X className="w-4 h-4" />
               </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label className="text-slate-300">Nombre *</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ej: SUM, Gimnasio, Parrilla 1"
-                className="mt-2 bg-slate-800 border-slate-700 text-white"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="md:col-span-1">
+                <Label className="text-slate-300 text-xs">Nombre *</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="SUM, Gimnasio, Parrilla 1"
+                  className="mt-1 bg-slate-800 border-slate-700 text-white rounded-md"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 text-xs">Duración de la reserva</Label>
+                <select
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
+                  className="mt-1 w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-md text-sm text-white focus:border-emerald-500 focus:ring-emerald-500/20"
+                >
+                  {DURATION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label className="text-slate-300 text-xs">Precio ($) - opcional</Label>
+                <Input
+                  type="number"
+                  value={formData.price ?? ''}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value ? parseInt(e.target.value) : undefined })}
+                  placeholder="Sin cargo"
+                  className="mt-1 bg-slate-800 border-slate-700 text-white rounded-md"
+                />
+              </div>
             </div>
             <div>
-              <Label className="text-slate-300">Descripción (visible para clientes)</Label>
+              <Label className="text-slate-300 text-xs">Descripción - opcional</Label>
               <Input
                 value={formData.description || ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value || undefined })}
-                placeholder="Ej: Habilitado para un máximo de 8 personas"
-                className="mt-2 bg-slate-800 border-slate-700 text-white"
-              />
-            </div>
-            <div>
-              <Label className="text-slate-300">Duración *</Label>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {SPACE_DURATIONS.map((duration) => (
-                  <Button
-                    key={duration.value}
-                    type="button"
-                    variant={formData.duration === duration.value ? "default" : "outline"}
-                    onClick={() => setFormData({ ...formData, duration: duration.value })}
-                    className={formData.duration === duration.value 
-                      ? "bg-emerald-500 text-white" 
-                      : "border-slate-700 text-slate-300 hover:bg-slate-700"
-                    }
-                  >
-                    <Clock className="w-4 h-4 mr-1" />
-                    {duration.label}
-                  </Button>
-                ))}
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-sm text-slate-500">Personalizada (min):</span>
-                <Input
-                  type="number"
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: Math.min(1440, Math.max(15, parseInt(e.target.value) || 60)) })}
-                  className="w-24 bg-slate-800 border-slate-700 text-white"
-                  min={15}
-                  max={1440}
-                  step={15}
-                />
-                <span className="text-sm text-slate-500">(máx. 24h)</span>
-              </div>
-            </div>
-            <div>
-              <Label className="text-slate-300">Precio ($) - opcional</Label>
-              <Input
-                type="number"
-                value={formData.price || ''}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value ? parseFloat(e.target.value) : undefined })}
-                placeholder="Sin cargo si está vacío"
-                className="mt-2 w-48 bg-slate-800 border-slate-700 text-white"
+                placeholder="Ej: Salón de usos múltiples con aire acondicionado"
+                className="mt-1 bg-slate-800 border-slate-700 text-white rounded-md"
               />
             </div>
             <div className="flex gap-2">
               <Button 
                 onClick={handleCreate} 
                 disabled={createService.isPending}
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl"
               >
                 {createService.isPending ? (
                   <>
@@ -204,7 +179,7 @@ export function ServicesManager() {
                   'Crear espacio'
                 )}
               </Button>
-              <Button variant="outline" onClick={() => setIsCreating(false)} className="border-slate-700 text-slate-300">
+              <Button variant="outline" onClick={() => setIsCreating(false)} className="border-slate-700 text-slate-300 rounded-xl">
                 Cancelar
               </Button>
             </div>
@@ -212,166 +187,150 @@ export function ServicesManager() {
         </Card>
       )}
 
-      {/* Lista de duraciones */}
+      {/* Lista de espacios - misma estructura que onboarding (cards por espacio) */}
       {!services || services.length === 0 ? (
-        <Card className="bg-slate-900/50 border-slate-800">
+        <Card className="bg-slate-900/50 border-slate-800 rounded-xl">
           <CardContent className="py-12 text-center">
-            <div className="text-6xl mb-4">⏱️</div>
-            <p className="text-slate-400 mb-4">No hay duraciones configuradas</p>
+            <p className="text-slate-400 mb-4">No hay espacios configurados</p>
             <Button 
               onClick={() => setIsCreating(true)}
-              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950"
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Crear Primera Duración
+              Agregar espacio
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {services.map((service) => (
-            <Card key={service.id} className="overflow-hidden bg-slate-900/50 border-slate-800">
-              <div 
-                className="py-4 px-6 text-white flex items-center justify-between"
-                style={{
-                  background: service.isActive 
-                    ? 'linear-gradient(135deg, rgb(16 185 129 / 0.3) 0%, rgb(16 185 129 / 0.1) 100%)'
-                    : 'linear-gradient(135deg, #374151 0%, #1f2937 100%)'
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  <span className="text-2xl font-bold">{formatDuration(service.duration)}</span>
+        <div className="space-y-4">
+          {services.map((service, index) => (
+            <Card key={service.id} className="p-4 border border-slate-700 rounded-xl bg-slate-800/50">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-semibold text-emerald-400">Espacio {index + 1}</span>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditingId(service.id)
+                      setFormData({
+                        name: service.name,
+                        description: service.description || '',
+                        duration: service.duration,
+                        price: service.price ? Number(service.price) : undefined,
+                        isActive: service.isActive,
+                      })
+                    }}
+                    className="text-slate-400 hover:text-white hover:bg-slate-700"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(service.id)}
+                    className="text-red-500 hover:text-red-400 hover:bg-red-500/20"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
-                {!service.isActive && (
-                  <Badge variant="secondary" className="bg-white/20 text-white">
-                    Inactivo
-                  </Badge>
-                )}
               </div>
-
-              <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg text-white">{service.name}</h3>
-                    {service.description && (
-                      <p className="text-sm text-slate-500 mt-1">{service.description}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="text-slate-400 hover:text-white hover:bg-blue-900/30"
-                      onClick={() => {
-                        setEditingId(service.id)
-                        setFormData({
-                          name: service.name,
-                          description: service.description || '',
-                          duration: service.duration,
-                          price: service.price ? Number(service.price) : undefined,
-                          isActive: service.isActive,
-                        })
-                      }}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                      onClick={() => handleDelete(service.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-1">
+                  <span className="text-xs text-slate-500">Nombre</span>
+                  <p className="font-medium text-white">{service.name}</p>
                 </div>
-                
-                {service.price && (
-                  <div className="flex items-center gap-1 text-xl font-bold text-emerald-400">
-                    <DollarSign className="w-5 h-5" />
-                    <span>{Number(service.price).toLocaleString()}</span>
-                  </div>
-                )}
-              </CardContent>
+                <div>
+                  <span className="text-xs text-slate-500">Duración</span>
+                  <p className="font-medium text-white">{formatDuration(service.duration)}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500">Precio</span>
+                  <p className="font-medium text-white">{service.price ? `$${Number(service.price).toLocaleString()}` : 'Sin cargo'}</p>
+                </div>
+              </div>
+              {service.description && (
+                <div className="mt-3">
+                  <span className="text-xs text-slate-500">Descripción</span>
+                  <p className="text-sm text-slate-300">{service.description}</p>
+                </div>
+              )}
+              {!service.isActive && (
+                <Badge variant="secondary" className="mt-2 bg-white/20 text-white">Inactivo</Badge>
+              )}
             </Card>
           ))}
+          <Button
+            variant="outline"
+            onClick={() => setIsCreating(true)}
+            className="w-full border-dashed border-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 rounded-xl"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Agregar otro espacio
+          </Button>
         </div>
       )}
 
-      {/* Modal de edición - scrollable para no cortar en pantallas chicas */}
+      {/* Modal de edición - misma UI que onboarding */}
       {editingId && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-start justify-center p-4 py-8 min-h-0">
-          <Card className="w-full max-w-md my-auto max-h-[calc(100vh-4rem)] overflow-y-auto bg-slate-900/50 border-slate-800 shrink-0">
+          <Card className="w-full max-w-md my-auto max-h-[calc(100vh-4rem)] overflow-y-auto bg-slate-900/50 border-slate-800 rounded-xl shrink-0">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-white">⏱️ Editar Duración</CardTitle>
+                <CardTitle className="text-white">Editar espacio</CardTitle>
                 <Button variant="ghost" size="icon" onClick={() => setEditingId(null)} className="text-white/60 hover:text-white">
                   <X className="w-4 h-4" />
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label className="text-slate-300">Nombre *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="mt-2 bg-slate-800 border-slate-700 text-white"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-1">
+                  <Label className="text-slate-300 text-xs">Nombre *</Label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="SUM, Gimnasio, Parrilla 1"
+                    className="mt-1 bg-slate-800 border-slate-700 text-white rounded-md"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300 text-xs">Duración de la reserva</Label>
+                  <select
+                    value={formData.duration}
+                    onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
+                    className="mt-1 w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-md text-sm text-white focus:border-emerald-500"
+                  >
+                    {DURATION_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-slate-300 text-xs">Precio ($) - opcional</Label>
+                  <Input
+                    type="number"
+                    value={formData.price ?? ''}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value ? parseFloat(e.target.value) : undefined })}
+                    placeholder="Sin cargo"
+                    className="mt-1 bg-slate-800 border-slate-700 text-white rounded-md"
+                  />
+                </div>
               </div>
               <div>
-                <Label className="text-slate-300">Descripción (visible para clientes)</Label>
+                <Label className="text-slate-300 text-xs">Descripción - opcional</Label>
                 <Input
                   value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value || undefined })}
-                  placeholder="Ej: Habilitado para un máximo de 8 personas"
-                  className="mt-2 bg-slate-800 border-slate-700 text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300">Duración</Label>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {SPACE_DURATIONS.map((duration) => (
-                    <Button
-                      key={duration.value}
-                      type="button"
-                      variant={formData.duration === duration.value ? "default" : "outline"}
-                      onClick={() => setFormData({ ...formData, duration: duration.value })}
-                      className={formData.duration === duration.value 
-                        ? "bg-emerald-500 text-white" 
-                        : "border-slate-700 text-slate-300"
-                      }
-                    >
-                      {duration.label}
-                    </Button>
-                  ))}
-                </div>
-                <Input
-                  type="number"
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: Math.min(1440, Math.max(15, parseInt(e.target.value) || 60)) })}
-                  className="mt-2 w-32 bg-slate-800 border-slate-700 text-white"
-                  min={15}
-                  max={1440}
-                  step={15}
-                />
-                <span className="text-xs text-slate-500">min (máx. 1440 = 24h)</span>
-              </div>
-              <div>
-                <Label className="text-slate-300">Precio ($)</Label>
-                <Input
-                  type="number"
-                  value={formData.price || ''}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value ? parseFloat(e.target.value) : undefined })}
-                  className="mt-2 bg-slate-800 border-slate-700 text-white"
+                  placeholder="Ej: Salón de usos múltiples con aire acondicionado"
+                  className="mt-1 bg-slate-800 border-slate-700 text-white rounded-md"
                 />
               </div>
               <div className="flex gap-2">
                 <Button 
                   onClick={() => handleUpdate(editingId, formData)}
                   disabled={updateService.isPending}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl"
                 >
                   {updateService.isPending ? (
                     <>
@@ -382,7 +341,7 @@ export function ServicesManager() {
                     'Guardar'
                   )}
                 </Button>
-                <Button variant="outline" onClick={() => setEditingId(null)} className="border-slate-700 text-slate-300">
+                <Button variant="outline" onClick={() => setEditingId(null)} className="border-slate-700 text-slate-300 rounded-xl">
                   Cancelar
                 </Button>
               </div>
