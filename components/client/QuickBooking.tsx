@@ -178,7 +178,9 @@ export function QuickBooking() {
             })
             const slotList = Array.isArray(slots) ? slots : []
             const availableCount = slotList.filter((s: TimeSlot) => s.available).length
-            console.log(`[Availability] ${space.name} (${dateStr}): ${slotList.length} slots, ${availableCount} disponibles`, slotList.length ? slotList.slice(0, 5).map((s: TimeSlot) => s.time) : [])
+            const allTimes = slotList.map((s: TimeSlot) => s.time)
+            console.log(`[Availability] ${space.name} (${dateStr}): ${slotList.length} slots, ${availableCount} disponibles`, allTimes.slice(0, 5))
+            if (allTimes.length >= 17) console.log(`[Availability] ${space.name} horarios 2º/3º bloque:`, allTimes[8], allTimes[16])
             const duration = space.duration ?? 30
             slotList.forEach((slot: TimeSlot) => {
               if (slot.available) {
