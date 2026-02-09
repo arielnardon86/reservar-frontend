@@ -217,17 +217,11 @@ export function QuickBooking() {
     return slotEnd.getTime() <= now.getTime()
   }
 
-  // Disponibilidad por franja exacta (HH:mm). El backend devuelve horas en hora local del edificio.
+  // Disponibilidad por franja exacta (HH:mm). El backend devuelve horas en hora local del edificio;
+  // no convertir a UTC al buscar, sino coincidir solo por hora local para que 08:00 no matchee con 11:00.
   const isSlotTimeInMapAvailable = (spaceId: string, timeLocal: string): boolean => {
-    const keyLocal = `${spaceId}-${timeLocal}`
-    const vLocal = availabilityMap.get(keyLocal)
-    if (vLocal !== undefined) return vLocal === true
-    const [h, m] = timeLocal.split(':').map(Number)
-    const d = new Date(selectedDate)
-    d.setHours(h, m, 0, 0)
-    const timeUTC = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-    const vUTC = availabilityMap.get(`${spaceId}-${timeUTC}`)
-    return vUTC === true
+    const key = `${spaceId}-${timeLocal}`
+    return availabilityMap.get(key) === true
   }
 
   // Bloques ocupados por reservas (debe estar antes de getAvailableBlocks que lo usa)
