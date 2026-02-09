@@ -61,6 +61,10 @@ interface OnboardingData {
   logoUrl?: string
   spaces: Space[]
   schedule: { [key: string]: DaySchedule }
+  /** Si false, cada espacio tiene su propio horario en spaceSchedules */
+  applyScheduleToAllSpaces?: boolean
+  /** Horario por espacio cuando applyScheduleToAllSpaces es false. Key = space.id */
+  spaceSchedules?: { [spaceId: string]: { [key: string]: DaySchedule } }
 }
 
 const steps: OnboardingStep[] = [
@@ -162,6 +166,8 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
       { id: generateId(), name: "Parrilla 1", description: "", duration: 180 },
     ],
     schedule: defaultSchedule(),
+    applyScheduleToAllSpaces: true,
+    spaceSchedules: {},
   })
 
   const createTenant = useCreateTenant()
@@ -191,12 +197,17 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
 
   const addSpace = () => {
     const num = data.spaces.length + 1
-    updateData({
+    const newId = generateId()
+    const updates: Partial<OnboardingData> = {
       spaces: [
         ...data.spaces,
-        { id: generateId(), name: `Espacio ${num}`, description: "", duration: 120 }
+        { id: newId, name: `Espacio ${num}`, description: "", duration: 120 }
       ]
-    })
+    }
+    if (data.applyScheduleToAllSpaces === false && data.spaceSchedules) {
+      updates.spaceSchedules = { ...data.spaceSchedules, [newId]: { ...data.schedule } }
+    }
+    updateData(updates)
   }
 
   const removeSpace = (id: string) => {
@@ -215,35 +226,72 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
 
   const maxSpaceDuration = Math.max(60, ...data.spaces.map((s) => s.duration))
 
-  const addTurno = (dayKey: string) => {
+  const addTurno = (dayKey: string, spaceId?: string) => {
     const defaultStart = "14:00"
     const defaultEnd = addMinutesToTime(defaultStart, maxSpaceDuration)
-    const day = normalizeDaySchedule(data.schedule[dayKey], dayKey)
+    const schedule = spaceId && data.applyScheduleToAllSpaces === false && data.spaceSchedules?.[spaceId]
+      ? data.spaceSchedules[spaceId]
+      : data.schedule
+    const readKey = dayKey === "all" ? "monday" : dayKey
+    const day = normalizeDaySchedule(schedule[readKey], readKey)
     const newTurno = { start: defaultStart, end: defaultEnd }
+    const nextTurnos = [...day.turnos, newTurno]
+    if (spaceId && data.applyScheduleToAllSpaces === false) {
+      const spaceSched = data.spaceSchedules?.[spaceId] ?? { ...data.schedule }
+      if (dayKey === "all") {
+        const next = Object.fromEntries(
+          DAY_KEYS.map((k) => [k, { enabled: day.enabled, turnos: nextTurnos }])
+        )
+        updateData({ spaceSchedules: { ...data.spaceSchedules, [spaceId]: { ...spaceSched, ...next } } })
+      } else {
+        updateData({
+          spaceSchedules: {
+            ...data.spaceSchedules,
+            [spaceId]: { ...spaceSched, [dayKey]: { enabled: day.enabled, turnos: nextTurnos } },
+          },
+        })
+      }
+      return
+    }
     if (dayKey === "all") {
       const next = Object.fromEntries(
-        DAY_KEYS.map((k) => [
-          k,
-          { enabled: day.enabled, turnos: [...day.turnos, newTurno] },
-        ])
+        DAY_KEYS.map((k) => [k, { enabled: day.enabled, turnos: nextTurnos }])
       ) as OnboardingData["schedule"]
       updateData({ schedule: { ...data.schedule, ...next } })
     } else {
       updateData({
         schedule: {
           ...data.schedule,
-          [dayKey]: { enabled: day.enabled, turnos: [...day.turnos, newTurno] },
+          [dayKey]: { enabled: day.enabled, turnos: nextTurnos },
         },
       })
     }
   }
 
-  const removeTurno = (dayKey: string, turnoIndex: number) => {
+  const removeTurno = (dayKey: string, turnoIndex: number, spaceId?: string) => {
     const key = dayKey === "all" ? "monday" : dayKey
-    const day = normalizeDaySchedule(data.schedule[key], key)
+    const schedule = spaceId && data.applyScheduleToAllSpaces === false && data.spaceSchedules?.[spaceId]
+      ? data.spaceSchedules[spaceId]
+      : data.schedule
+    const day = normalizeDaySchedule(schedule[key], key)
     const turnos = day.turnos.filter((_, i) => i !== turnoIndex)
     const fallback = [{ start: "08:00", end: addMinutesToTime("08:00", maxSpaceDuration) }]
     const finalTurnos = turnos.length ? turnos : fallback
+    if (spaceId && data.applyScheduleToAllSpaces === false) {
+      const spaceSched = data.spaceSchedules?.[spaceId] ?? { ...data.schedule }
+      if (dayKey === "all") {
+        const next = Object.fromEntries(DAY_KEYS.map((k) => [k, { enabled: day.enabled, turnos: finalTurnos }]))
+        updateData({ spaceSchedules: { ...data.spaceSchedules, [spaceId]: { ...spaceSched, ...next } } })
+      } else {
+        updateData({
+          spaceSchedules: {
+            ...data.spaceSchedules,
+            [spaceId]: { ...spaceSched, [dayKey]: { enabled: day.enabled, turnos: finalTurnos } },
+          },
+        })
+      }
+      return
+    }
     if (dayKey === "all") {
       const next = Object.fromEntries(
         DAY_KEYS.map((k) => [k, { enabled: day.enabled, turnos: finalTurnos }])
@@ -259,9 +307,12 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
     }
   }
 
-  const updateTurno = (dayKey: string, turnoIndex: number, updates: { start?: string; end?: string }) => {
+  const updateTurno = (dayKey: string, turnoIndex: number, updates: { start?: string; end?: string }, spaceId?: string) => {
     const key = dayKey === "all" ? "monday" : dayKey
-    const day = normalizeDaySchedule(data.schedule[key], key)
+    const schedule = spaceId && data.applyScheduleToAllSpaces === false && data.spaceSchedules?.[spaceId]
+      ? data.spaceSchedules[spaceId]
+      : data.schedule
+    const day = normalizeDaySchedule(schedule[key], key)
     const turnos = [...day.turnos]
     const current = turnos[turnoIndex]
     let next = { ...current, ...updates }
@@ -269,6 +320,21 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
       next.end = addMinutesToTime(updates.start, maxSpaceDuration)
     }
     turnos[turnoIndex] = next
+    if (spaceId && data.applyScheduleToAllSpaces === false) {
+      const spaceSched = data.spaceSchedules?.[spaceId] ?? { ...data.schedule }
+      if (dayKey === "all") {
+        const nextSchedule = Object.fromEntries(DAY_KEYS.map((k) => [k, { enabled: day.enabled, turnos }]))
+        updateData({ spaceSchedules: { ...data.spaceSchedules, [spaceId]: { ...spaceSched, ...nextSchedule } } })
+      } else {
+        updateData({
+          spaceSchedules: {
+            ...data.spaceSchedules,
+            [spaceId]: { ...spaceSched, [dayKey]: { enabled: day.enabled, turnos } },
+          },
+        })
+      }
+      return
+    }
     if (dayKey === "all") {
       const nextSchedule = Object.fromEntries(
         DAY_KEYS.map((k) => [k, { enabled: day.enabled, turnos }])
@@ -341,8 +407,11 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
         })
 
         // 3. Crear Horarios para este espacio (serviceId): un registro por turno; si cierre < apertura = hasta madrugada (2 registros)
+        const scheduleForSpace = data.applyScheduleToAllSpaces !== false
+          ? data.schedule
+          : (data.spaceSchedules?.[space.id] ?? data.schedule)
         for (const dayKey of DAY_KEYS) {
-          const dayData = normalizeDaySchedule(data.schedule[dayKey], dayKey)
+          const dayData = normalizeDaySchedule(scheduleForSpace[dayKey], dayKey)
           if (!dayData.enabled || !dayData.turnos?.length) continue
           const dayOfWeek = dayMap[dayKey]
           for (const turno of dayData.turnos) {
@@ -666,9 +735,29 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold text-slate-900">Horarios de los espacios</h2>
-                    <p className="text-sm text-gray-500">Apertura y cierre por día en <strong>formato 24 h</strong>. Podés definir todos los turnos que necesites por día. Se aplica a todos los espacios.</p>
+                    <p className="text-sm text-gray-500">Apertura y cierre por día en <strong>formato 24 h</strong>. Podés definir todos los turnos que necesites por día.</p>
                   </div>
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer mt-2 mb-4">
+                  <input
+                    type="checkbox"
+                    checked={data.applyScheduleToAllSpaces !== false}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      if (!checked) {
+                        const next: { [id: string]: OnboardingData["schedule"] } = {}
+                        data.spaces.forEach((sp) => {
+                          next[sp.id] = { ...data.schedule }
+                        })
+                        updateData({ applyScheduleToAllSpaces: false, spaceSchedules: next })
+                      } else {
+                        updateData({ applyScheduleToAllSpaces: true })
+                      }
+                    }}
+                    className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-sm text-gray-700">Aplicar mismo horario y turnos a todos los espacios</span>
+                </label>
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 space-y-1">
                   <p className="text-xs font-medium text-amber-800">Cierre a la madrugada</p>
                   <p className="text-xs text-gray-600">Si el cierre es anterior a la apertura (ej. apertura 22:00, cierre 02:00), se considera abierto hasta la madrugada del día siguiente.</p>
@@ -699,8 +788,16 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
                 <p className="text-xs text-gray-500 mb-3">
                   El cierre se calcula automáticamente según la duración configurada de los espacios (ej. apertura 11:00 + 4h = cierre 15:00).
                 </p>
-                <div className="space-y-3">
-                  {(applyToAllDays
+                {(() => {
+                  const scheduleContexts: { schedule: OnboardingData["schedule"]; spaceId?: string; title?: string }[] =
+                    data.applyScheduleToAllSpaces !== false
+                      ? [{ schedule: data.schedule }]
+                      : data.spaces.map((sp) => ({
+                          schedule: data.spaceSchedules?.[sp.id] ?? data.schedule,
+                          spaceId: sp.id,
+                          title: sp.name,
+                        }))
+                  const dayEntries = (applyToAllDays
                     ? [["all", "Todos los días"]] as [string, string][]
                     : Object.entries({
                         monday: "Lunes",
@@ -710,99 +807,111 @@ export function OnboardingWizard({ inviteToken }: OnboardingWizardProps = {}) {
                         friday: "Viernes",
                         saturday: "Sábado",
                         sunday: "Domingo",
-                      })
-                  ).map(([key, label]) => {
-                    const scheduleKey = key === "all" ? "monday" : key
-                    const day = normalizeDaySchedule(data.schedule[scheduleKey], scheduleKey)
-                    const turnos = day.turnos.length ? day.turnos : [{ start: "08:00", end: addMinutesToTime("08:00", maxSpaceDuration) }]
-                    return (
-                      <div key={key} className="p-4 border border-gray-200 rounded-xl bg-white space-y-3">
-                        <div className="flex items-center gap-4">
-                          <div className="w-24">
-                            <span className="font-medium text-gray-700">{label}</span>
+                      }))
+                  return (
+                    <div className="space-y-6">
+                      {scheduleContexts.map((ctx) => (
+                        <div key={ctx.spaceId ?? "global"} className={ctx.title ? "rounded-xl border border-gray-200 bg-white p-4" : ""}>
+                          {ctx.title && <h3 className="font-semibold text-slate-800 mb-4">{ctx.title}</h3>}
+                          <div className="space-y-3">
+                            {dayEntries.map(([key, label]) => {
+                              const scheduleKey = key === "all" ? "monday" : key
+                              const day = normalizeDaySchedule(ctx.schedule[scheduleKey], scheduleKey)
+                              const turnos = day.turnos.length ? day.turnos : [{ start: "08:00", end: addMinutesToTime("08:00", maxSpaceDuration) }]
+                              return (
+                                <div key={key} className="p-4 border border-gray-200 rounded-xl bg-white space-y-3">
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-24">
+                                      <span className="font-medium text-gray-700">{label}</span>
+                                    </div>
+                                    <Button
+                                      variant={day.enabled ? "default" : "outline"}
+                                      size="sm"
+                                      onClick={() => {
+                                        const next = normalizeDaySchedule(ctx.schedule[scheduleKey], scheduleKey)
+                                        const toggle = { ...next, enabled: !next.enabled }
+                                        if (ctx.spaceId && data.applyScheduleToAllSpaces === false) {
+                                          const spaceSched = data.spaceSchedules?.[ctx.spaceId] ?? { ...data.schedule }
+                                          if (key === "all") {
+                                            const updated = Object.fromEntries(DAY_KEYS.map((k) => [k, toggle]))
+                                            updateData({ spaceSchedules: { ...data.spaceSchedules, [ctx.spaceId]: { ...spaceSched, ...updated } } })
+                                          } else {
+                                            updateData({ spaceSchedules: { ...data.spaceSchedules, [ctx.spaceId]: { ...spaceSched, [key]: toggle } } })
+                                          }
+                                        } else if (key === "all") {
+                                          const updated = Object.fromEntries(DAY_KEYS.map((k) => [k, toggle])) as OnboardingData["schedule"]
+                                          updateData({ schedule: { ...data.schedule, ...updated } })
+                                        } else {
+                                          updateData({ schedule: { ...data.schedule, [key]: toggle } })
+                                        }
+                                      }}
+                                      className={day.enabled ? "bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl" : "border-gray-300 text-gray-500 rounded-xl"}
+                                    >
+                                      {day.enabled ? "Abierto" : "Cerrado"}
+                                    </Button>
+                                  </div>
+                                  {day.enabled && (
+                                    <div className="pl-0 md:pl-24 space-y-3 border-l-2 border-gray-100 md:ml-2 md:pl-6">
+                                      {turnos.map((turno, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 flex-wrap gap-y-2">
+                                          <span className="text-xs font-medium text-gray-500 w-16 shrink-0">
+                                            {turnos.length > 1 ? `Turno ${idx + 1}` : "Horario"}
+                                          </span>
+                                          <select
+                                            value={toStartOption(turno.start)}
+                                            onChange={(e) => updateTurno(key, idx, { start: e.target.value }, ctx.spaceId)}
+                                            className="h-10 rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-emerald-500 focus:ring-emerald-500/20 w-24 font-mono"
+                                            aria-label="Apertura (24 h)"
+                                          >
+                                            {HOUR_OPTIONS_24.map((o) => (
+                                              <option key={o.value} value={o.value}>{o.label}</option>
+                                            ))}
+                                          </select>
+                                          <span className="text-gray-400 text-sm">a</span>
+                                          <select
+                                            value={toEndOption(turno.end)}
+                                            onChange={(e) => updateTurno(key, idx, { end: e.target.value }, ctx.spaceId)}
+                                            className="h-10 rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-emerald-500 focus:ring-emerald-500/20 w-24 font-mono"
+                                            aria-label="Cierre (24 h)"
+                                          >
+                                            {END_HOUR_OPTIONS_24.map((o) => (
+                                              <option key={o.value} value={o.value}>{o.label}</option>
+                                            ))}
+                                          </select>
+                                          {turnos.length > 1 && (
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => removeTurno(key, idx, ctx.spaceId)}
+                                              className="text-red-500 hover:text-red-700 hover:bg-red-50 h-9"
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                          )}
+                                        </div>
+                                      ))}
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => addTurno(key, ctx.spaceId)}
+                                        className="border-2 border-dashed border-emerald-400 text-emerald-600 hover:bg-emerald-50 font-medium"
+                                      >
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Agregar turno
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
                           </div>
-                          <Button
-                            variant={day.enabled ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => {
-                              const next = normalizeDaySchedule(data.schedule[scheduleKey], scheduleKey)
-                              const toggle = { ...next, enabled: !next.enabled }
-                              if (key === "all") {
-                                const updated = Object.fromEntries(
-                                  DAY_KEYS.map((k) => [k, toggle])
-                                ) as OnboardingData["schedule"]
-                                updateData({ schedule: { ...data.schedule, ...updated } })
-                              } else {
-                                updateData({
-                                  schedule: { ...data.schedule, [key]: toggle },
-                                })
-                              }
-                            }}
-                            className={day.enabled
-                              ? "bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl"
-                              : "border-gray-300 text-gray-500 rounded-xl"
-                            }
-                          >
-                            {day.enabled ? "Abierto" : "Cerrado"}
-                          </Button>
                         </div>
-                        {day.enabled && (
-                          <div className="pl-0 md:pl-24 space-y-3 border-l-2 border-gray-100 md:ml-2 md:pl-6">
-                            {turnos.map((turno, idx) => (
-                              <div key={idx} className="flex items-center gap-2 flex-wrap gap-y-2">
-                                <span className="text-xs font-medium text-gray-500 w-16 shrink-0">
-                                  {turnos.length > 1 ? `Turno ${idx + 1}` : "Horario"}
-                                </span>
-                                <select
-                                  value={toStartOption(turno.start)}
-                                  onChange={(e) => updateTurno(key, idx, { start: e.target.value })}
-                                  className="h-10 rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-emerald-500 focus:ring-emerald-500/20 w-24 font-mono"
-                                  aria-label="Apertura (24 h)"
-                                >
-                                  {HOUR_OPTIONS_24.map((o) => (
-                                    <option key={o.value} value={o.value}>{o.label}</option>
-                                  ))}
-                                </select>
-                                <span className="text-gray-400 text-sm">a</span>
-                                <select
-                                  value={toEndOption(turno.end)}
-                                  onChange={(e) => updateTurno(key, idx, { end: e.target.value })}
-                                  className="h-10 rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-emerald-500 focus:ring-emerald-500/20 w-24 font-mono"
-                                  aria-label="Cierre (24 h)"
-                                >
-                                  {END_HOUR_OPTIONS_24.map((o) => (
-                                    <option key={o.value} value={o.value}>{o.label}</option>
-                                  ))}
-                                </select>
-                                {turnos.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeTurno(key, idx)}
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 h-9"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            ))}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => addTurno(key)}
-                              className="border-2 border-dashed border-emerald-400 text-emerald-600 hover:bg-emerald-50 font-medium"
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Agregar turno
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                      ))}
+                    </div>
+                  )
+                })()}
                 
                 <div className="flex justify-between pt-6">
                   <Button variant="outline" onClick={previousStep} className="border-gray-300 rounded-xl">
