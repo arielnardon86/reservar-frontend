@@ -76,6 +76,47 @@ const slotToTime = (slot: number): string => {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
 }
 
+/** Medianoche del día dado en la zona del edificio, en ms UTC. */
+function midnightBuildingUtcMs(date: Date, timeZone: string): number {
+  const y = date.getFullYear()
+  const month = date.getMonth()
+  const day = date.getDate()
+  const noonUtc = Date.UTC(y, month, day, 12, 0, 0, 0)
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(new Date(noonUtc))
+  const hourNoon = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '12', 10)
+  const minNoon = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10)
+  const offsetMinutes = (hourNoon - 12) * 60 + minNoon
+  return noonUtc - (12 * 60 + offsetMinutes) * 60 * 1000
+}
+
+/** Convierte slot index a "HH:mm" en la zona horaria del edificio para que coincida con lo que envía el backend. */
+function slotToTimeInBuilding(slotIndex: number, date: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const slotUtc = midnightBuildingUtcMs(date, timeZone) + (HOUR_START * 60 + slotIndex * SLOT_DURATION) * 60 * 1000
+  const slotParts = formatter.formatToParts(new Date(slotUtc))
+  const h = slotParts.find((p) => p.type === 'hour')?.value ?? '00'
+  const m = slotParts.find((p) => p.type === 'minute')?.value ?? '00'
+  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+}
+
+/** Devuelve el Date (UTC) del instante (date + timeStr "HH:mm") en la zona del edificio. */
+function dateAtTimeInBuilding(date: Date, timeStr: string, timeZone: string): Date {
+  const [h, m] = timeStr.split(':').map(Number)
+  const ms = midnightBuildingUtcMs(date, timeZone) + (h * 60 + m) * 60 * 1000
+  return new Date(ms)
+}
+
 const timeToSlot = (time: string): number => {
   const [h, m] = time.split(':').map(Number)
   const totalMinutes = h * 60 + m
@@ -163,6 +204,10 @@ export function QuickBooking() {
     return h
   }, [])
 
+  // Hora del slot en zona del edificio (para coincidir con backend y evitar desfase de 1h)
+  const getSlotTimeStr = (slotIndex: number): string =>
+    tenant?.timezone ? slotToTimeInBuilding(slotIndex, selectedDate, tenant.timezone) : slotToTime(slotIndex)
+
   useEffect(() => {
     const loadAllAvailability = async () => {
       if (!activeSpaces.length || !tenantSlug) return
@@ -207,16 +252,21 @@ export function QuickBooking() {
     loadAllAvailability()
   }, [activeSpaces, selectedDate, tenantSlug])
 
-  // Un slot (30 min) está en el pasado solo si su FIN es anterior a ahora → permite reservar dentro del bloque ya iniciado
+  // Un slot (30 min) está en el pasado solo si su FIN es anterior a ahora (en hora del edificio si hay timezone)
   const isSlotInPast = (slotIndex: number): boolean => {
     if (!isSameDay(selectedDate, new Date())) return false
-    const time = slotToTime(slotIndex)
-    const [h, m] = time.split(':').map(Number)
-    const now = new Date()
-    const slotEnd = new Date(selectedDate)
-    slotEnd.setHours(h, m + SLOT_DURATION, 0, 0)
-    slotEnd.setSeconds(0, 0)
-    return slotEnd.getTime() <= now.getTime()
+    const startTime = getSlotTimeStr(slotIndex)
+    const endTime = addMinutesToTime(startTime, SLOT_DURATION)
+    const now = Date.now()
+    const slotEndMs = tenant?.timezone
+      ? dateAtTimeInBuilding(selectedDate, endTime, tenant.timezone).getTime()
+      : (() => {
+          const [h, m] = endTime.split(':').map(Number)
+          const d = new Date(selectedDate)
+          d.setHours(h, m, 0, 0)
+          return d.getTime()
+        })()
+    return slotEndMs <= now
   }
 
   // Disponibilidad por franja exacta (HH:mm). El backend devuelve horas en hora local del edificio;
@@ -278,7 +328,7 @@ export function QuickBooking() {
     const availableSlots: number[] = []
     for (let s = 0; s < TOTAL_SLOTS; s++) {
       if (isSlotInPast(s)) continue
-      const timeStr = slotToTime(s)
+      const timeStr = getSlotTimeStr(s)
       if (isSlotTimeInMapAvailable(space.id, timeStr)) {
         // Verificar que no esté reservado
         const isReserved = reserved.some(r => s >= r.startSlot && s < r.endSlot)
@@ -320,7 +370,7 @@ export function QuickBooking() {
           const endSlot = startSlot + durationSlots
           const allAvailable = Array.from({ length: durationSlots }, (_, i) => startSlot + i).every(
             slotIdx => {
-              const timeStr = slotToTime(slotIdx)
+              const timeStr = getSlotTimeStr(slotIdx)
               return isSlotTimeInMapAvailable(space.id, timeStr) &&
                      !reserved.some(r => slotIdx >= r.startSlot && slotIdx < r.endSlot)
             }
@@ -333,7 +383,7 @@ export function QuickBooking() {
       if (rangeLength < durationSlots && rangeLength >= 1) {
         const allAvailable = Array.from({ length: rangeLength }, (_, i) => range.start + i).every(
           slotIdx => {
-            const timeStr = slotToTime(slotIdx)
+            const timeStr = getSlotTimeStr(slotIdx)
             return isSlotTimeInMapAvailable(space.id, timeStr) &&
                    !reserved.some(r => slotIdx >= r.startSlot && slotIdx < r.endSlot)
           }
@@ -372,7 +422,7 @@ export function QuickBooking() {
   const getDurationOptions = (space: Service, startSlot: number): DurationOption[] => {
     const block = getAvailableBlocksCached(space).find(b => b.startSlot === startSlot)
     if (!block) return []
-    const endTime = slotToTime(block.endSlot)
+    const endTime = getSlotTimeStr(block.endSlot)
     const blockMinutes = (block.endSlot - block.startSlot) * SLOT_DURATION
     const label = blockMinutes === 60 ? "1 hora" : blockMinutes === 90 ? "1h 30m" : `${blockMinutes / 60} horas`
     return [{
@@ -403,7 +453,7 @@ export function QuickBooking() {
 
   const handleSelectDuration = (option: DurationOption) => {
     if (!activeSelection || !option.available || !option.service) return
-    const startTime = slotToTime(activeSelection.startSlot)
+    const startTime = getSlotTimeStr(activeSelection.startSlot)
     setSelectedSlot({
       space: activeSelection.space,
       date: selectedDate,
@@ -760,8 +810,8 @@ export function QuickBooking() {
                       const durationSlots = block.endSlot - block.startSlot
                       const durationMinutes = durationSlots * SLOT_DURATION
                       const isLongDuration = durationMinutes >= 90
-                      const startTime = slotToTime(block.startSlot)
-                      const endTime = slotToTime(block.endSlot)
+                      const startTime = getSlotTimeStr(block.startSlot)
+                      const endTime = getSlotTimeStr(block.endSlot)
                       
                       // Buscar el appointment correspondiente para mostrar info
                       const appointment = dayAppointments[space.id]?.find(apt => {
@@ -845,7 +895,7 @@ export function QuickBooking() {
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{activeSelection.space.description}</p>
                   )}
                   <p className="text-lg font-bold text-emerald-600 mt-2">
-                    {slotToTime(activeSelection.startSlot)} – {getDurationOptions(activeSelection.space, activeSelection.startSlot)[0]?.endTime ?? addMinutesToTime(slotToTime(activeSelection.startSlot), activeSelection.space.duration)}
+                    {getSlotTimeStr(activeSelection.startSlot)} – {getDurationOptions(activeSelection.space, activeSelection.startSlot)[0]?.endTime ?? addMinutesToTime(getSlotTimeStr(activeSelection.startSlot), activeSelection.space.duration)}
                   </p>
                 </div>
                 <button
