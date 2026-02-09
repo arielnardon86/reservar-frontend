@@ -65,12 +65,14 @@ class ApiClient {
     }
 
     // Agregar tenant ID si está disponible
-    // Los endpoints públicos y super-admin no requieren tenantId
+    // Los endpoints públicos y super-admin no requieren tenantId (reserva pública usa tenantSlug en query)
     const isPublicEndpoint = endpoint.includes('/tenants/slug/') || 
                              endpoint.includes('/tenants?') ||
                              endpoint === '/tenants' && options.method === 'GET' ||
                              endpoint.includes('/auth/') ||
-                             endpoint.includes('/super-admin/');
+                             endpoint.includes('/super-admin/') ||
+                             endpoint.includes('/appointments/availability') ||
+                             endpoint.includes('/appointments/day');
     
     if (this.tenantId) {
       (headers as Record<string, string>)['x-tenant-id'] = this.tenantId;
@@ -84,16 +86,6 @@ class ApiClient {
     if (typeof window !== 'undefined' && this.baseUrl.includes('localhost')) {
       console.error('[API Client] ⚠️ ADVERTENCIA: Intentando conectarse a localhost en producción. Verifica NEXT_PUBLIC_API_URL en Vercel.');
     }
-
-    // Log detallado de la request
-    console.log('[API Client] Request details:', {
-      method: options.method || 'GET',
-      url,
-      baseUrl: this.baseUrl,
-      endpoint,
-      hasTenantId: !!this.tenantId,
-      headers: Object.keys(headers),
-    });
 
     try {
       const response = await fetch(url, {
