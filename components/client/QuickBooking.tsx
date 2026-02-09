@@ -235,6 +235,15 @@ export function QuickBooking() {
                 newMap.set(`${space.id}-${slot.time}`, false)
               }
             })
+            // Debug: verificar cómo se mapean algunos índices de slot a horas en la zona del edificio
+            if (tenant?.timezone) {
+              const debugSlots = [6, 16, 24] // aprox 11:00, 16:00, 20:00 en hora inicio 08:00
+              const debugTimes = debugSlots.map(i => `${i}:${getSlotTimeStr(i)}`)
+              console.log(
+                `[SlotsDebug] tz=${tenant.timezone} fecha=${dateStr} para ${space.name} ->`,
+                debugTimes.join(' | ')
+              )
+            }
           } catch (e: unknown) {
             const err = e as { message?: string; statusCode?: number }
             console.error(`[Availability] Error espacio ${space.name} (${space.id}):`, err?.message ?? err, err?.statusCode ?? '')
