@@ -176,8 +176,11 @@ export function QuickBooking() {
               serviceId: space.id,
               date: dateStr,
             })
+            const slotList = Array.isArray(slots) ? slots : []
+            const availableCount = slotList.filter((s: TimeSlot) => s.available).length
+            console.log(`[Availability] ${space.name} (${dateStr}): ${slotList.length} slots, ${availableCount} disponibles`, slotList.length ? slotList.slice(0, 5).map((s: TimeSlot) => s.time) : [])
             const duration = space.duration ?? 30
-            slots.forEach((slot: TimeSlot) => {
+            slotList.forEach((slot: TimeSlot) => {
               if (slot.available) {
                 const segmentTimes = expandSlotToSegments(slot.time, duration, SLOT_DURATION)
                 segmentTimes.forEach(t => newMap.set(`${space.id}-${t}`, true))
@@ -185,8 +188,9 @@ export function QuickBooking() {
                 newMap.set(`${space.id}-${slot.time}`, false)
               }
             })
-          } catch (e) {
-            console.error(`Error espacio ${space.id}:`, e)
+          } catch (e: unknown) {
+            const err = e as { message?: string; statusCode?: number }
+            console.error(`[Availability] Error espacio ${space.name} (${space.id}):`, err?.message ?? err, err?.statusCode ?? '')
           }
         })
         await Promise.all(promises)
