@@ -76,12 +76,15 @@ const slotToTime = (slot: number): string => {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
 }
 
-/** Medianoche del día dado en la zona del edificio, en ms UTC. */
+/** Medianoche del día dado en la zona del edificio, en ms UTC. Usa día del calendario desde la fecha seleccionada. */
 function midnightBuildingUtcMs(date: Date, timeZone: string): number {
-  const y = date.getFullYear()
-  const month = date.getMonth()
-  const day = date.getDate()
-  const noonUtc = Date.UTC(y, month, day, 12, 0, 0, 0)
+  // Usar día de calendario explícito (yyyy-MM-dd) para no depender de getDate() en la tz del navegador
+  const dateStr = format(date, 'yyyy-MM-dd')
+  const [y, mStr, dStr] = dateStr.split('-')
+  const month = parseInt(mStr ?? '1', 10) - 1
+  const day = parseInt(dStr ?? '1', 10)
+  const year = parseInt(y ?? '2020', 10)
+  const noonUtc = Date.UTC(year, month, day, 12, 0, 0, 0)
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     hour: '2-digit',
@@ -91,8 +94,8 @@ function midnightBuildingUtcMs(date: Date, timeZone: string): number {
   const parts = formatter.formatToParts(new Date(noonUtc))
   const hourNoon = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '12', 10)
   const minNoon = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10)
-  const offsetMinutes = (hourNoon - 12) * 60 + minNoon
-  return noonUtc - (12 * 60 + offsetMinutes) * 60 * 1000
+  const minutesFromMidnight = hourNoon * 60 + minNoon
+  return noonUtc - minutesFromMidnight * 60 * 1000
 }
 
 /** Convierte slot index a "HH:mm" en la zona horaria del edificio para que coincida con lo que envía el backend. */
