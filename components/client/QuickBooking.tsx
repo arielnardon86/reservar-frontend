@@ -153,10 +153,19 @@ const addMinutesToTime = (time: string, minutes: number): string => {
   return `${String(hCap).padStart(2, '0')}:${String(newM).padStart(2, '0')}`
 }
 
+// Normalizar tiempo del API a "HH:mm" (por si viene "16:00:00" o con espacios).
+const normalizeTimeHHMM = (t: string): string => {
+  if (typeof t !== 'string' || !t.trim()) return '00:00'
+  const parts = t.trim().split(':').map(p => parseInt(p, 10))
+  const h = Number.isNaN(parts[0]) ? 0 : Math.max(0, Math.min(23, parts[0]))
+  const m = Number.isNaN(parts[1]) ? 0 : Math.max(0, Math.min(59, parts[1] ?? 0))
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 // El backend devuelve un slot por bloque (ej. "11:00" para 240 min). El frontend necesita
 // cada segmento de 30 min marcado como disponible para pintar bloques verdes.
 const expandSlotToSegments = (startTime: string, durationMinutes: number, segmentMinutes: number = SLOT_DURATION): string[] => {
-  const [h, m] = startTime.split(':').map(Number)
+  const [h, m] = normalizeTimeHHMM(startTime).split(':').map(Number)
   let totalMins = h * 60 + m
   const endMins = totalMins + durationMinutes
   const segments: string[] = []
@@ -245,11 +254,12 @@ export function QuickBooking() {
             if (allTimes.length >= 17) console.log(`[Availability] ${space.name} horarios 2º/3º bloque:`, allTimes[8], allTimes[16])
             const duration = space.duration ?? 30
             slotList.forEach((slot: TimeSlot) => {
+              const timeNorm = normalizeTimeHHMM(String(slot?.time ?? ''))
               if (slot.available) {
-                const segmentTimes = expandSlotToSegments(slot.time, duration, SLOT_DURATION)
+                const segmentTimes = expandSlotToSegments(timeNorm, duration, SLOT_DURATION)
                 segmentTimes.forEach(t => newMap.set(`${space.id}-${t}`, true))
               } else {
-                newMap.set(`${space.id}-${slot.time}`, false)
+                newMap.set(`${space.id}-${timeNorm}`, false)
               }
             })
           } catch (e: unknown) {
