@@ -117,6 +117,20 @@ function dateAtTimeInBuilding(date: Date, timeStr: string, timeZone: string): Da
   return new Date(ms)
 }
 
+/** Convierte un ISO string a "HH:mm" en la zona del edificio (para citas del backend). */
+function isoToBuildingTimeStr(isoString: string, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(new Date(isoString))
+  const h = parts.find((p) => p.type === 'hour')?.value ?? '00'
+  const m = parts.find((p) => p.type === 'minute')?.value ?? '00'
+  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+}
+
 const timeToSlot = (time: string): number => {
   const [h, m] = time.split(':').map(Number)
   const totalMinutes = h * 60 + m
@@ -235,15 +249,6 @@ export function QuickBooking() {
                 newMap.set(`${space.id}-${slot.time}`, false)
               }
             })
-            // Debug: verificar cómo se mapean algunos índices de slot a horas en la zona del edificio
-            if (tenant?.timezone) {
-              const debugSlots = [6, 16, 24] // aprox 11:00, 16:00, 20:00 en hora inicio 08:00
-              const debugTimes = debugSlots.map(i => `${i}:${getSlotTimeStr(i)}`)
-              console.log(
-                `[SlotsDebug] tz=${tenant.timezone} fecha=${dateStr} para ${space.name} ->`,
-                debugTimes.join(' | ')
-              )
-            }
           } catch (e: unknown) {
             const err = e as { message?: string; statusCode?: number }
             console.error(`[Availability] Error espacio ${space.name} (${space.id}):`, err?.message ?? err, err?.statusCode ?? '')
@@ -285,18 +290,15 @@ export function QuickBooking() {
     return availabilityMap.get(key) === true
   }
 
-  // Bloques ocupados por reservas (debe estar antes de getAvailableBlocks que lo usa)
+  // Bloques ocupados por reservas (hora del edificio para posicionar bien en cualquier timezone del usuario)
   const getOccupiedBlocks = (spaceId: string): OccupiedBlock[] => {
     const blocks: OccupiedBlock[] = []
     const appointments = dayAppointments[spaceId] || []
+    const tz = tenant?.timezone
     appointments.forEach(apt => {
       const start = new Date(apt.startTime)
       const end = new Date(apt.endTime)
-      const startHour = start.getHours()
-      const startMin = start.getMinutes()
-      const endHour = end.getHours()
-      const endMin = end.getMinutes()
-      const startTimeStr = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`
+      const startTimeStr = tz ? isoToBuildingTimeStr(apt.startTime, tz) : `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`
       const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
       const startSlot = timeToSlot(startTimeStr)
       const endSlot = startSlot + (durationMinutes / SLOT_DURATION)
@@ -485,13 +487,26 @@ export function QuickBooking() {
     setIsBooking(true)
     try {
       const dateStr = format(selectedSlot.date, 'yyyy-MM-dd')
-      const [year, month, day] = dateStr.split('-').map(Number)
-      const [startH, startM] = selectedSlot.startTime.split(':').map(Number)
-      const [endH, endM] = selectedSlot.endTime.split(':').map(Number)
-      const startTime = new Date(year, month - 1, day, startH, startM, 0, 0)
-      let endTime = new Date(year, month - 1, day, endH, endM, 0, 0)
+      // Usar hora del edificio para que la reserva quede a las 16:00-20:00 del edificio, no del navegador
+      const startTime = tenant?.timezone
+        ? dateAtTimeInBuilding(selectedSlot.date, selectedSlot.startTime, tenant.timezone)
+        : (() => {
+            const [startH, startM] = selectedSlot.startTime.split(':').map(Number)
+            return new Date(selectedSlot.date.getFullYear(), selectedSlot.date.getMonth(), selectedSlot.date.getDate(), startH, startM, 0, 0)
+          })()
+      let endTime = tenant?.timezone
+        ? dateAtTimeInBuilding(selectedSlot.date, selectedSlot.endTime, tenant.timezone)
+        : (() => {
+            const [endH, endM] = selectedSlot.endTime.split(':').map(Number)
+            return new Date(selectedSlot.date.getFullYear(), selectedSlot.date.getMonth(), selectedSlot.date.getDate(), endH, endM, 0, 0)
+          })()
       if (endTime.getTime() <= startTime.getTime()) {
-        endTime = new Date(year, month - 1, day + 1, endH, endM, 0, 0)
+        const dayAfter = new Date(selectedSlot.date)
+        dayAfter.setDate(dayAfter.getDate() + 1)
+        const [endH, endM] = selectedSlot.endTime.split(':').map(Number)
+        endTime = tenant?.timezone
+          ? dateAtTimeInBuilding(dayAfter, selectedSlot.endTime, tenant.timezone)
+          : new Date(selectedSlot.date.getFullYear(), selectedSlot.date.getMonth(), selectedSlot.date.getDate() + 1, endH, endM, 0, 0)
       }
 
       const appointment = await appointmentsApi.createPublic(tenantSlug, {
@@ -824,10 +839,10 @@ export function QuickBooking() {
                       
                       // Buscar el appointment correspondiente para mostrar info
                       const appointment = dayAppointments[space.id]?.find(apt => {
-                        const aptStart = new Date(apt.startTime)
-                        const aptStartHour = aptStart.getHours()
-                        const aptStartMin = aptStart.getMinutes()
-                        const aptStartStr = `${aptStartHour.toString().padStart(2, '0')}:${aptStartMin.toString().padStart(2, '0')}`
+                        const aptStartStr = tenant?.timezone ? isoToBuildingTimeStr(apt.startTime, tenant.timezone) : (() => {
+                          const d = new Date(apt.startTime)
+                          return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+                        })()
                         return aptStartStr === startTime
                       })
                       
