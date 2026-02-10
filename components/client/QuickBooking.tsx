@@ -221,9 +221,9 @@ export function QuickBooking() {
     return h
   }, [])
 
-  // Hora del slot en zona del edificio (para coincidir con backend y evitar desfase de 1h)
-  const getSlotTimeStr = (slotIndex: number): string =>
-    tenant?.timezone ? slotToTimeInBuilding(slotIndex, selectedDate, tenant.timezone) : slotToTime(slotIndex)
+  // Hora del slot: grid fijo 8–24, el backend ya devuelve horas en hora edificio (16:00, 20:00).
+  // Usar slotToTime evita desfase por timezone; las etiquetas 8..23 son siempre hora del edificio.
+  const getSlotTimeStr = (slotIndex: number): string => slotToTime(slotIndex)
 
   useEffect(() => {
     const loadAllAvailability = async () => {
