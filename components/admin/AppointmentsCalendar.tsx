@@ -24,7 +24,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { format, startOfDay, isSameDay, isToday, addDays, subDays, parseISO } from "date-fns"
-import { toZonedTime, format as formatTz } from "date-fns-tz"
+import { toZonedTime } from "date-fns-tz"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
 import { AppointmentStatus } from "@/lib/api/types"
@@ -144,11 +144,10 @@ export function AppointmentsCalendar() {
     const timeZone = tenant?.timezone || 'America/Argentina/Buenos_Aires'
 
     // Convertir UTC a string en la zona horaria del tenant
-    // Usar formatTz para obtener la hora correcta sin depender del browser
-    const startTimeStr = formatTz(appointment.startTime, 'HH:mm', { timeZone })
+    const startTimeStr = format(toZonedTime(appointment.startTime, timeZone), 'HH:mm')
     const [startHour, startMin] = startTimeStr.split(':').map(Number)
 
-    const endStr = formatTz(appointment.endTime, 'HH:mm', { timeZone })
+    const endStr = format(toZonedTime(appointment.endTime, timeZone), 'HH:mm')
     const [endHour, endMin] = endStr.split(':').map(Number)
 
     const startSlot = timeToSlot(startTimeStr)
@@ -172,7 +171,7 @@ export function AppointmentsCalendar() {
     appointments.forEach(apt => {
       const timeZone = tenant?.timezone || 'America/Argentina/Buenos_Aires'
       // Calcular slots usando hora de edificio
-      const startTimeStr = formatTz(apt.startTime, 'HH:mm', { timeZone })
+      const startTimeStr = format(toZonedTime(apt.startTime, timeZone), 'HH:mm')
       const startSlot = timeToSlot(startTimeStr)
 
       // Duración en minutos (diferencia real de timestamps UTC es segura)
@@ -362,8 +361,8 @@ export function AppointmentsCalendar() {
                     const isLongDuration = durationMinutes >= 90
 
                     // Formatear horas locales
-                    const startTimeFormatted = formatTz(apt.startTime, 'HH:mm', { timeZone })
-                    const endTimeFormatted = formatTz(apt.endTime, 'HH:mm', { timeZone })
+                    const startTimeFormatted = format(toZonedTime(apt.startTime, timeZone), 'HH:mm')
+                    const endTimeFormatted = format(toZonedTime(apt.endTime, timeZone), 'HH:mm')
 
                     return (
                       <div
@@ -518,8 +517,8 @@ export function AppointmentsCalendar() {
                   <p className="text-gray-900 mt-1">
                     {(() => {
                       const timeZone = tenant?.timezone || 'America/Argentina/Buenos_Aires'
-                      const startStr = formatTz(selectedAppointment.startTime, 'HH:mm', { timeZone })
-                      const endStr = formatTz(selectedAppointment.endTime, 'HH:mm', { timeZone })
+                      const startStr = format(toZonedTime(selectedAppointment.startTime, timeZone), 'HH:mm')
+                      const endStr = format(toZonedTime(selectedAppointment.endTime, timeZone), 'HH:mm')
                       return `${startStr} - ${endStr}`
                     })()}
                   </p>

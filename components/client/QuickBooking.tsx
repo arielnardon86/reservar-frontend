@@ -10,8 +10,9 @@ import {
   addDays,
   startOfDay,
   isSameDay,
+  min,
 } from "date-fns"
-import { toZonedTime, fromZonedTime, format as formatTz } from "date-fns-tz"
+import { toZonedTime, fromZonedTime } from "date-fns-tz"
 import { es } from "date-fns/locale"
 import {
   Loader2,
@@ -91,7 +92,7 @@ function dateAtTimeInBuilding(date: Date, timeStr: string, timeZone: string): Da
 
 /** Convierte un ISO string a "HH:mm" en la zona del edificio. */
 function isoToBuildingTimeStr(isoString: string, timeZone: string): string {
-  return formatTz(isoString, 'HH:mm', { timeZone })
+  return format(toZonedTime(isoString, timeZone), 'HH:mm')
 }
 
 const timeToSlot = (time: string): number => {
