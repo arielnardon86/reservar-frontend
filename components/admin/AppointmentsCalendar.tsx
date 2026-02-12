@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Label } from "@/components/ui/label"
-import { 
-  useAppointments, 
+import {
+  useAppointments,
   useUpdateAppointment,
   useServices,
 } from "@/lib/api/hooks"
@@ -24,6 +24,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { format, startOfDay, isSameDay, isToday, addDays, subDays, parseISO } from "date-fns"
+import { toZonedTime } from "date-fns-tz"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
 import { AppointmentStatus } from "@/lib/api/types"
@@ -97,7 +98,7 @@ export function AppointmentsCalendar() {
   // Filtrar turnos del día actual
   const dayAppointments = useMemo(() => {
     if (!appointments) return []
-    
+
     return appointments.filter(apt => {
       const aptDate = startOfDay(parseISO(apt.startTime))
       return isSameDay(aptDate, currentDate) && apt.status !== AppointmentStatus.CANCELLED
@@ -129,7 +130,7 @@ export function AppointmentsCalendar() {
       const key = `${space.id}-${dateStr}`
       const slots = availabilityData[key] || []
       const spaceAppointments = appointmentsBySpace[space.id] || []
-      
+
       totalSlots += slots.length
       occupiedSlots += spaceAppointments.length
     })
@@ -139,22 +140,25 @@ export function AppointmentsCalendar() {
 
   // Helper para calcular posición de turnos
   const getAppointmentPosition = (appointment: any) => {
-    // Parsear como fecha local (no UTC) para que coincida con lo que reservó el usuario
-    const start = new Date(appointment.startTime)
-    const end = new Date(appointment.endTime)
-    
+    // Usar la zona horaria del tenant o default
+    const timeZone = tenant?.timezone || 'America/Argentina/Buenos_Aires'
+
+    // Convertir UTC a la zona horaria del tenant para visualización correcta
+    const start = toZonedTime(appointment.startTime, timeZone)
+    const end = toZonedTime(appointment.endTime, timeZone)
+
     // Usar hora local del navegador
     const startHour = start.getHours()
     const startMin = start.getMinutes()
     const startTimeStr = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`
-    
+
     const startSlot = timeToSlot(startTimeStr)
     const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
     const durationSlots = durationMinutes / SLOT_DURATION
-    
+
     const leftPercent = slotToPercent(startSlot)
     const widthPercent = slotToPercent(durationSlots)
-    
+
     return { leftPercent, widthPercent, startTimeStr }
   }
 
@@ -162,17 +166,18 @@ export function AppointmentsCalendar() {
   const getOccupiedBlocks = (spaceId: string) => {
     const appointments = appointmentsBySpace[spaceId] || []
     const blocks: Array<{ startSlot: number; endSlot: number }> = []
-    
+
     appointments.forEach(apt => {
-      const start = parseISO(apt.startTime)
-      const end = parseISO(apt.endTime)
+      const timeZone = tenant?.timezone || 'America/Argentina/Buenos_Aires'
+      const start = toZonedTime(apt.startTime, timeZone)
+      const end = toZonedTime(apt.endTime, timeZone)
       const startSlot = timeToSlot(format(start, 'HH:mm'))
       const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
       const endSlot = startSlot + (durationMinutes / SLOT_DURATION)
-      
+
       blocks.push({ startSlot, endSlot })
     })
-    
+
     return blocks
   }
 
@@ -187,7 +192,7 @@ export function AppointmentsCalendar() {
       } else {
         await updateAppointment.mutateAsync({
           id,
-          data: { 
+          data: {
             status: AppointmentStatus.CANCELLED,
           },
         })
@@ -199,11 +204,11 @@ export function AppointmentsCalendar() {
   }
 
   const navigateDate = (direction: "prev" | "next") => {
-      setCurrentDate(prev => {
-        const newDate = new Date(prev)
-        newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1))
-        return newDate
-      })
+    setCurrentDate(prev => {
+      const newDate = new Date(prev)
+      newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1))
+      return newDate
+    })
   }
 
   const goToToday = () => {
@@ -234,40 +239,40 @@ export function AppointmentsCalendar() {
     <div className="space-y-6">
       {/* Header con controles */}
       <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
             <h2 className="text-2xl font-bold text-emerald-400">📅 Gestión de Reservas</h2>
-              <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-gray-600 mt-1">
               {format(currentDate, "EEEE, d 'de' MMMM, yyyy", { locale: es })}
-              </p>
-            </div>
-            
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => navigateDate("prev")}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate("prev")}
               className="border-gray-300"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={goToToday}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={goToToday}
               className="min-w-[100px] border-gray-300"
-                >
-                  Hoy
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => navigateDate("next")}
+            >
+              Hoy
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigateDate("next")}
               className="border-gray-300"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
 
         {/* Ocupación global */}
         <div className="mt-6 pt-6 border-t border-gray-200">
@@ -279,8 +284,8 @@ export function AppointmentsCalendar() {
               </p>
             </div>
             <div className="w-64">
-              <Progress 
-                value={globalOccupancy} 
+              <Progress
+                value={globalOccupancy}
                 className="h-3"
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -290,25 +295,25 @@ export function AppointmentsCalendar() {
             </div>
           </div>
         </div>
-          </div>
+      </div>
 
       {/* Timeline Grid - Espacios */}
       <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden shadow-xl overflow-x-auto">
         {/* Header con horas */}
         <div className="flex border-b border-slate-700 bg-slate-800 relative">
           {/* Columna izquierda fija - Header */}
-          <div className="w-48 shrink-0 p-4 border-r border-white/20 sticky left-0 z-30 bg-slate-800 shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
+          <div className="w-28 sm:w-48 shrink-0 p-2 sm:p-4 border-r border-white/20 sticky left-0 z-30 bg-slate-800 shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
             <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Espacios</span>
           </div>
           {/* Horarios scrolleables */}
           <div className="flex-1 flex">
             {hours.map((h) => (
-              <div 
+              <div
                 key={h}
                 className="flex-1 p-3 text-center text-sm font-medium text-white/70 border-r border-white/10 last:border-r-0"
               >
                 {h}
-            </div>
+              </div>
             ))}
           </div>
         </div>
@@ -320,7 +325,7 @@ export function AppointmentsCalendar() {
             const spaceAppointments = appointmentsBySpace[space.id] || []
 
             return (
-              <div 
+              <div
                 key={space.id}
                 className={cn(
                   "flex border-b border-gray-100 last:border-b-0 relative",
@@ -328,7 +333,7 @@ export function AppointmentsCalendar() {
                 )}
               >
                 {/* Espacio info - Columna izquierda fija */}
-                <div className="w-48 shrink-0 p-4 border-r border-gray-200 flex flex-col justify-center bg-gradient-to-r from-emerald-500/5 to-transparent sticky left-0 z-20 shadow-[2px_0_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: idx % 2 === 0 ? 'white' : 'rgb(249 250 251 / 0.5)' }}>
+                <div className="w-28 sm:w-48 shrink-0 p-2 sm:p-4 border-r border-gray-200 flex flex-col justify-center bg-gradient-to-r from-emerald-500/5 to-transparent sticky left-0 z-20 shadow-[2px_0_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: idx % 2 === 0 ? 'white' : 'rgb(249 250 251 / 0.5)' }}>
                   <div className="font-semibold text-emerald-400">{space.name}</div>
                   {space.description && (
                     <div className="text-[10px] text-gray-400 mt-1 line-clamp-1">{space.description}</div>
@@ -337,17 +342,18 @@ export function AppointmentsCalendar() {
                     {spaceAppointments.length} reservas
                   </div>
                 </div>
-                      
+
                 {/* Timeline */}
                 <div className="flex-1 h-16 relative select-none bg-gradient-to-b from-slate-800/50 to-slate-800/30">
                   {/* Turnos como bloques */}
                   {spaceAppointments.map((apt) => {
                     const { leftPercent, widthPercent, startTimeStr } = getAppointmentPosition(apt)
-                    const start = new Date(apt.startTime)
-                    const end = new Date(apt.endTime)
+                    const timeZone = tenant?.timezone || 'America/Argentina/Buenos_Aires'
+                    const start = toZonedTime(apt.startTime, timeZone)
+                    const end = toZonedTime(apt.endTime, timeZone)
                     const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
                     const isLongDuration = durationMinutes >= 90
-                    
+
                     // Formatear horas locales
                     const startHour = start.getHours()
                     const startMin = start.getMinutes()
@@ -355,15 +361,15 @@ export function AppointmentsCalendar() {
                     const endMin = end.getMinutes()
                     const startTimeFormatted = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`
                     const endTimeFormatted = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`
-                    
+
                     return (
                       <div
                         key={apt.id}
                         onClick={() => setSelectedAppointment(apt)}
                         className={cn(
                           "absolute top-1 bottom-1 rounded-sm cursor-pointer transition-all hover:opacity-90 z-10 shadow-sm border-2",
-                          apt.status === AppointmentStatus.CONFIRMED 
-                            ? "bg-emerald-500 text-white border-emerald-500" 
+                          apt.status === AppointmentStatus.CONFIRMED
+                            ? "bg-emerald-500 text-white border-emerald-500"
                             : "bg-slate-700 text-white border-slate-600",
                           isLongDuration && "ring-2 ring-amber-400/50"
                         )}
@@ -389,10 +395,10 @@ export function AppointmentsCalendar() {
                       </div>
                     )
                   })}
-                        </div>
-                      </div>
-              )
-            })}
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         {/* Footer */}
@@ -401,7 +407,7 @@ export function AppointmentsCalendar() {
             <Clock className="w-4 h-4 text-emerald-400" />
             <span>Click en una reserva para ver detalles</span>
           </div>
-          
+
           <div className="flex items-center gap-5 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-5 h-4 rounded bg-emerald-500" />
@@ -446,15 +452,15 @@ export function AppointmentsCalendar() {
             <CardHeader className="bg-gradient-to-r from-slate-800 to-slate-700">
               <div className="flex justify-between items-center">
                 <CardTitle className="text-white">Detalles de la Reserva</CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setSelectedAppointment(null)}
                   className="text-white/60 hover:text-white hover:bg-white/10"
                 >
                   <X className="w-4 h-4" />
                 </Button>
-                    </div>
+              </div>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div className="space-y-3">
@@ -467,12 +473,12 @@ export function AppointmentsCalendar() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div>
                   <Label className="text-gray-600 text-xs">Email</Label>
                   <div className="flex items-center gap-2 mt-1">
                     <Mail className="w-4 h-4 text-emerald-400" />
-                    <a 
+                    <a
                       href={`mailto:${selectedAppointment.customer.email}`}
                       className="text-emerald-400 hover:underline"
                     >
@@ -480,7 +486,7 @@ export function AppointmentsCalendar() {
                     </a>
                   </div>
                 </div>
-                
+
                 {(selectedAppointment as any).departamento || (selectedAppointment as any).piso ? (
                   <>
                     <div>
@@ -498,18 +504,19 @@ export function AppointmentsCalendar() {
                     <p className="text-gray-900 mt-1">{selectedAppointment.professional.fullName}</p>
                   </div>
                 ) : null}
-                
+
                 <div>
                   <Label className="text-gray-600 text-xs">Espacio / Duración</Label>
                   <p className="text-gray-900 mt-1">{selectedAppointment.service.name}</p>
                 </div>
-                
+
                 <div>
                   <Label className="text-gray-600 text-xs">Horario</Label>
                   <p className="text-gray-900 mt-1">
                     {(() => {
-                      const start = new Date(selectedAppointment.startTime)
-                      const end = new Date(selectedAppointment.endTime)
+                      const timeZone = tenant?.timezone || 'America/Argentina/Buenos_Aires'
+                      const start = toZonedTime(selectedAppointment.startTime, timeZone)
+                      const end = toZonedTime(selectedAppointment.endTime, timeZone)
                       const startHour = start.getHours()
                       const startMin = start.getMinutes()
                       const endHour = end.getHours()
@@ -518,23 +525,23 @@ export function AppointmentsCalendar() {
                     })()}
                   </p>
                 </div>
-                
+
                 <div>
                   <Label className="text-gray-600 text-xs">Fecha</Label>
                   <p className="text-gray-900 mt-1">
                     {format(new Date(selectedAppointment.startTime), "EEEE d 'de' MMMM", { locale: es })}
                   </p>
                 </div>
-                
+
                 {selectedAppointment.service.price && (
                   <div>
                     <Label className="text-gray-600 text-xs">Precio</Label>
                     <p className="text-emerald-400 font-bold text-lg mt-1">
                       ${Number(selectedAppointment.service.price).toLocaleString()}
                     </p>
-                            </div>
-                          )}
-                
+                  </div>
+                )}
+
                 <div>
                   <Label className="text-gray-600 text-xs">Estado</Label>
                   <div className="mt-1">
@@ -550,7 +557,7 @@ export function AppointmentsCalendar() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex gap-2 pt-4 border-t border-gray-200">
                 <Button
                   variant="outline"
@@ -559,9 +566,9 @@ export function AppointmentsCalendar() {
                 >
                   Cerrar
                 </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
