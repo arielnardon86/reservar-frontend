@@ -5,17 +5,18 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { 
-  format, 
-  addDays, 
-  startOfDay, 
+import {
+  format,
+  addDays,
+  startOfDay,
   isSameDay,
 } from "date-fns"
+import { toZonedTime, fromZonedTime, format as formatTz } from "date-fns-tz"
 import { es } from "date-fns/locale"
-import { 
-  Loader2, 
-  CheckCircle2, 
-  X, 
+import {
+  Loader2,
+  CheckCircle2,
+  X,
   ChevronLeft,
   ChevronRight,
   MapPin,
@@ -76,62 +77,21 @@ const slotToTime = (slot: number): string => {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
 }
 
-/** Medianoche del día dado en la zona del edificio, en ms UTC. Usa día del calendario desde la fecha seleccionada. */
+/** Medianoche del día dado en la zona del edificio, en ms UTC. */
 function midnightBuildingUtcMs(date: Date, timeZone: string): number {
-  // Usar día de calendario explícito (yyyy-MM-dd) para no depender de getDate() en la tz del navegador
   const dateStr = format(date, 'yyyy-MM-dd')
-  const [y, mStr, dStr] = dateStr.split('-')
-  const month = parseInt(mStr ?? '1', 10) - 1
-  const day = parseInt(dStr ?? '1', 10)
-  const year = parseInt(y ?? '2020', 10)
-  const noonUtc = Date.UTC(year, month, day, 12, 0, 0, 0)
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-  const parts = formatter.formatToParts(new Date(noonUtc))
-  const hourNoon = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '12', 10)
-  const minNoon = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10)
-  const minutesFromMidnight = hourNoon * 60 + minNoon
-  return noonUtc - minutesFromMidnight * 60 * 1000
-}
-
-/** Convierte slot index a "HH:mm" en la zona horaria del edificio para que coincida con lo que envía el backend. */
-function slotToTimeInBuilding(slotIndex: number, date: Date, timeZone: string): string {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-  const slotUtc = midnightBuildingUtcMs(date, timeZone) + (HOUR_START * 60 + slotIndex * SLOT_DURATION) * 60 * 1000
-  const slotParts = formatter.formatToParts(new Date(slotUtc))
-  const h = slotParts.find((p) => p.type === 'hour')?.value ?? '00'
-  const m = slotParts.find((p) => p.type === 'minute')?.value ?? '00'
-  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+  return fromZonedTime(`${dateStr} 00:00`, timeZone).getTime()
 }
 
 /** Devuelve el Date (UTC) del instante (date + timeStr "HH:mm") en la zona del edificio. */
 function dateAtTimeInBuilding(date: Date, timeStr: string, timeZone: string): Date {
-  const [h, m] = timeStr.split(':').map(Number)
-  const ms = midnightBuildingUtcMs(date, timeZone) + (h * 60 + m) * 60 * 1000
-  return new Date(ms)
+  const dateStr = format(date, 'yyyy-MM-dd')
+  return fromZonedTime(`${dateStr} ${timeStr}`, timeZone)
 }
 
-/** Convierte un ISO string a "HH:mm" en la zona del edificio (para citas del backend). */
+/** Convierte un ISO string a "HH:mm" en la zona del edificio. */
 function isoToBuildingTimeStr(isoString: string, timeZone: string): string {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-  const parts = formatter.formatToParts(new Date(isoString))
-  const h = parts.find((p) => p.type === 'hour')?.value ?? '00'
-  const m = parts.find((p) => p.type === 'minute')?.value ?? '00'
-  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+  return formatTz(isoString, 'HH:mm', { timeZone })
 }
 
 const timeToSlot = (time: string): number => {
@@ -183,13 +143,13 @@ export function QuickBooking() {
   const tenantSlug = params?.tenantSlug as string
   const { tenant } = useTenantContext()
   const queryClient = useQueryClient()
-  
+
   const { data: services, isLoading: loadingServices } = useServices()
-  
+
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()))
   const [availabilityMap, setAvailabilityMap] = useState<Map<string, boolean>>(new Map())
   const [loadingAvailability, setLoadingAvailability] = useState(false)
-  
+
   const [activeSelection, setActiveSelection] = useState<{
     spaceId: string
     startSlot: number
@@ -200,13 +160,13 @@ export function QuickBooking() {
   const [bookingForm, setBookingForm] = useState({ name: "", lastName: "", email: "", departamento: "", piso: "" })
   const [isBooking, setIsBooking] = useState(false)
   const [bookingSuccess, setBookingSuccess] = useState(false)
-  
+
   const days = useMemo(() => generateDays(), [])
   const activeSpaces = useMemo(() => services?.filter(s => s.isActive) || [], [services])
-  
+
   const dateStr = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate])
   const { data: dayAppointmentsData } = useDayAppointments(tenantSlug, dateStr)
-  
+
   const dayAppointments = useMemo(() => {
     if (!dayAppointmentsData || !activeSpaces.length) return {}
     const bySpace: Record<string, any[]> = {}
@@ -288,11 +248,11 @@ export function QuickBooking() {
     const slotEndMs = tenant?.timezone
       ? dateAtTimeInBuilding(selectedDate, endTime, tenant.timezone).getTime()
       : (() => {
-          const [h, m] = endTime.split(':').map(Number)
-          const d = new Date(selectedDate)
-          d.setHours(h, m, 0, 0)
-          return d.getTime()
-        })()
+        const [h, m] = endTime.split(':').map(Number)
+        const d = new Date(selectedDate)
+        d.setHours(h, m, 0, 0)
+        return d.getTime()
+      })()
     return slotEndMs <= now
   }
 
@@ -347,7 +307,7 @@ export function QuickBooking() {
     if (durationSlots < 1 || durationSlots > TOTAL_SLOTS) return []
     const reserved = getOccupiedBlocks(space.id)
     const blocks: OccupiedBlock[] = []
-    
+
     // Encontrar todas las franjas de disponibilidad (slots consecutivos disponibles)
     const availableSlots: number[] = []
     for (let s = 0; s < TOTAL_SLOTS; s++) {
@@ -361,13 +321,13 @@ export function QuickBooking() {
         }
       }
     }
-    
+
     if (availableSlots.length === 0) return []
-    
+
     // Agrupar slots consecutivos en franjas
     const ranges: Array<{ start: number; end: number }> = []
     let currentRange: { start: number; end: number } | null = null
-    
+
     for (const slot of availableSlots) {
       if (!currentRange) {
         currentRange = { start: slot, end: slot + 1 }
@@ -382,7 +342,7 @@ export function QuickBooking() {
     if (currentRange) {
       ranges.push(currentRange)
     }
-    
+
     // Para cada franja: bloques de duración completa O bloque parcial (reserva dentro de turno ya empezado)
     for (const range of ranges) {
       const rangeLength = range.end - range.start
@@ -396,7 +356,7 @@ export function QuickBooking() {
             slotIdx => {
               const timeStr = getSlotTimeStr(slotIdx)
               return isSlotTimeInMapAvailable(space.id, timeStr) &&
-                     !reserved.some(r => slotIdx >= r.startSlot && slotIdx < r.endSlot)
+                !reserved.some(r => slotIdx >= r.startSlot && slotIdx < r.endSlot)
             }
           )
           if (allAvailable) blocks.push({ startSlot, endSlot })
@@ -409,13 +369,13 @@ export function QuickBooking() {
           slotIdx => {
             const timeStr = getSlotTimeStr(slotIdx)
             return isSlotTimeInMapAvailable(space.id, timeStr) &&
-                   !reserved.some(r => slotIdx >= r.startSlot && slotIdx < r.endSlot)
+              !reserved.some(r => slotIdx >= r.startSlot && slotIdx < r.endSlot)
           }
         )
         if (allAvailable) blocks.push({ startSlot: range.start, endSlot: range.end })
       }
     }
-    
+
     return blocks.sort((a, b) => a.startSlot - b.startSlot)
   }
 
@@ -504,15 +464,15 @@ export function QuickBooking() {
       const startTime = tenant?.timezone
         ? dateAtTimeInBuilding(selectedSlot.date, selectedSlot.startTime, tenant.timezone)
         : (() => {
-            const [startH, startM] = selectedSlot.startTime.split(':').map(Number)
-            return new Date(selectedSlot.date.getFullYear(), selectedSlot.date.getMonth(), selectedSlot.date.getDate(), startH, startM, 0, 0)
-          })()
+          const [startH, startM] = selectedSlot.startTime.split(':').map(Number)
+          return new Date(selectedSlot.date.getFullYear(), selectedSlot.date.getMonth(), selectedSlot.date.getDate(), startH, startM, 0, 0)
+        })()
       let endTime = tenant?.timezone
         ? dateAtTimeInBuilding(selectedSlot.date, selectedSlot.endTime, tenant.timezone)
         : (() => {
-            const [endH, endM] = selectedSlot.endTime.split(':').map(Number)
-            return new Date(selectedSlot.date.getFullYear(), selectedSlot.date.getMonth(), selectedSlot.date.getDate(), endH, endM, 0, 0)
-          })()
+          const [endH, endM] = selectedSlot.endTime.split(':').map(Number)
+          return new Date(selectedSlot.date.getFullYear(), selectedSlot.date.getMonth(), selectedSlot.date.getDate(), endH, endM, 0, 0)
+        })()
       if (endTime.getTime() <= startTime.getTime()) {
         const dayAfter = new Date(selectedSlot.date)
         dayAfter.setDate(dayAfter.getDate() + 1)
@@ -539,11 +499,11 @@ export function QuickBooking() {
 
       // Invalidar queries de disponibilidad y appointments para refrescar
       // React Query se encargará de recargarlas automáticamente
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['availability'],
         exact: false,
       })
-      
+
       // Invalidar también la query de appointments del día
       queryClient.invalidateQueries({
         queryKey: ['appointmentsByDay', tenantSlug, dateStr],
@@ -551,7 +511,7 @@ export function QuickBooking() {
 
       setBookingSuccess(true)
       toast.success("¡Reserva confirmada!")
-      
+
       // Marcar como no disponibles los slots reservados (claves en hora local, como devuelve el backend)
       setAvailabilityMap(prev => {
         const newMap = new Map(prev)
@@ -657,12 +617,12 @@ export function QuickBooking() {
             >
               <ChevronLeft className="w-5 h-5" />
             </Button>
-            
+
             <div className="flex gap-2 shrink-0">
               {days.map((day) => {
                 const isSelected = isSameDay(day, selectedDate)
                 const isToday = isSameDay(day, new Date())
-                
+
                 return (
                   <button
                     key={day.toISOString()}
@@ -672,8 +632,8 @@ export function QuickBooking() {
                     }}
                     className={cn(
                       "flex flex-col items-center px-3 sm:px-4 py-2 rounded-xl transition-all shrink-0 min-w-[56px]",
-                      isSelected 
-                        ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 font-bold" 
+                      isSelected
+                        ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 font-bold"
                         : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
                     )}
                   >
@@ -695,7 +655,7 @@ export function QuickBooking() {
                 )
               })}
             </div>
-            
+
             <Button
               variant="ghost"
               size="icon"
@@ -726,7 +686,7 @@ export function QuickBooking() {
             {/* Horarios scrolleables */}
             <div className="flex flex-1" style={{ minWidth: `${hours.length * 48}px` }}>
               {hours.map((h) => (
-                <div 
+                <div
                   key={h}
                   className="flex-1 min-w-[48px] p-2 sm:p-3 text-center text-xs sm:text-sm font-medium text-slate-400 border-r border-slate-700 last:border-r-0"
                 >
@@ -742,7 +702,7 @@ export function QuickBooking() {
                 <div className="w-8 h-8 border-3 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
               </div>
             )}
-            
+
             {activeSpaces.map((space) => {
               const occupiedBlocks = getOccupiedBlocks(space.id)
               const isActive = activeSelection?.spaceId === space.id
@@ -791,11 +751,11 @@ export function QuickBooking() {
                         const blocks = getAvailableBlocksCached(space)
                         const prevBlock = idx > 0 ? blocks[idx - 1] : null
                         const nextBlock = idx < blocks.length - 1 ? blocks[idx + 1] : null
-                        
+
                         // Detectar si hay un gap antes o después de este bloque
                         const hasGapBefore = prevBlock ? (block.startSlot - prevBlock.endSlot) > 0 : false
                         const hasGapAfter = nextBlock ? (nextBlock.startSlot - block.endSlot) > 0 : false
-                        
+
                         return (
                           <div
                             key={`avail-${space.id}-${idx}`}
@@ -807,12 +767,12 @@ export function QuickBooking() {
                               boxShadow: 'inset 0 0 0 1px rgba(6,95,70,0.9)',
                               // Separación visual: siempre bordes oscuros para distinguir bloques
                               // Si hay gap antes, el borde izquierdo será más visible
-                              borderLeft: hasGapBefore || idx === 0 
-                                ? '2px solid rgba(15,23,42,1)' 
+                              borderLeft: hasGapBefore || idx === 0
+                                ? '2px solid rgba(15,23,42,1)'
                                 : '1px solid rgba(6,95,70,0.5)',
                               // Si hay gap después, el borde derecho será más visible
                               borderRight: hasGapAfter || idx === blocks.length - 1
-                                ? '2px solid rgba(15,23,42,1)' 
+                                ? '2px solid rgba(15,23,42,1)'
                                 : '1px solid rgba(6,95,70,0.5)',
                               // Margen para crear gap visual cuando hay separación real
                               marginLeft: hasGapBefore ? '2px' : '0',
@@ -841,7 +801,7 @@ export function QuickBooking() {
                         )
                       })}
                     </div>
-                    
+
                     {/* Bloques ocupados - etiqueta sobre la franja roja */}
                     {occupiedBlocks.map((block, i) => {
                       const durationSlots = block.endSlot - block.startSlot
@@ -849,7 +809,7 @@ export function QuickBooking() {
                       const isLongDuration = durationMinutes >= 90
                       const startTime = getSlotTimeStr(block.startSlot)
                       const endTime = getSlotTimeStr(block.endSlot)
-                      
+
                       // Buscar el appointment correspondiente para mostrar info
                       const appointment = dayAppointments[space.id]?.find(apt => {
                         const aptStartStr = tenant?.timezone ? isoToBuildingTimeStr(apt.startTime, tenant.timezone) : (() => {
@@ -858,7 +818,7 @@ export function QuickBooking() {
                         })()
                         return aptStartStr === startTime
                       })
-                      
+
                       return (
                         <div
                           key={i}
@@ -877,10 +837,10 @@ export function QuickBooking() {
                         </div>
                       )
                     })}
-                    
+
                     {/* Bloque seleccionado */}
                     {selectedBlock && (
-                      <div 
+                      <div
                         className="absolute top-1 bottom-1 rounded border-2 border-emerald-400 bg-emerald-500/30 z-20"
                         style={{
                           left: `${slotToPercent(selectedBlock.startSlot)}%`,
@@ -915,13 +875,13 @@ export function QuickBooking() {
       {/* Popup de duración */}
       {activeSelection && (
         <>
-          <div 
-            className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" 
-            onClick={handleCloseSelection} 
+          <div
+            className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
+            onClick={handleCloseSelection}
           />
-          
+
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-            <div 
+            <div
               className="bg-white rounded-2xl shadow-2xl p-5 min-w-[300px] pointer-events-auto animate-in fade-in zoom-in-95 duration-150 border border-gray-200"
               onClick={(e) => e.stopPropagation()}
             >
@@ -943,24 +903,24 @@ export function QuickBooking() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              
+
               <div className="space-y-2">
                 {getDurationOptions(activeSelection.space, activeSelection.startSlot)
                   .filter(opt => opt.available)
                   .map((opt) => (
-                  <button
-                    key={opt.minutes}
-                    onClick={() => handleSelectDuration(opt)}
-                    className="w-full px-4 py-3.5 rounded-xl text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-600 cursor-pointer transition-colors flex items-center justify-between gap-3"
-                  >
-                    <span className="font-semibold">{opt.label}</span>
-                    {opt.service != null && (
-                      <span className="font-bold">
-                        {opt.service.price != null ? `$${Number(opt.service.price).toLocaleString()}` : 'Sin cargo'}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                    <button
+                      key={opt.minutes}
+                      onClick={() => handleSelectDuration(opt)}
+                      className="w-full px-4 py-3.5 rounded-xl text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-600 cursor-pointer transition-colors flex items-center justify-between gap-3"
+                    >
+                      <span className="font-semibold">{opt.label}</span>
+                      {opt.service != null && (
+                        <span className="font-bold">
+                          {opt.service.price != null ? `$${Number(opt.service.price).toLocaleString()}` : 'Sin cargo'}
+                        </span>
+                      )}
+                    </button>
+                  ))}
               </div>
             </div>
           </div>
@@ -1081,9 +1041,9 @@ export function QuickBooking() {
                     </div>
 
                     <div className="flex gap-3 pt-2">
-                      <Button 
-                        variant="outline" 
-                        onClick={handleCloseModal} 
+                      <Button
+                        variant="outline"
+                        onClick={handleCloseModal}
                         className="flex-1 border-gray-300 text-gray-600 hover:bg-gray-50"
                         disabled={isBooking}
                       >
@@ -1107,7 +1067,7 @@ export function QuickBooking() {
                   </div>
                   <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">¡Listo!</h3>
                   <p className="text-gray-500 mb-6">Confirmación enviada a {bookingForm.email}</p>
-                  
+
                   <div className="bg-slate-100 dark:bg-slate-800/50 rounded-xl p-4 mb-6 text-left text-sm border border-slate-200 dark:border-slate-700">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -1121,8 +1081,8 @@ export function QuickBooking() {
                     </div>
                   </div>
 
-                  <Button 
-                    onClick={handleCloseModal} 
+                  <Button
+                    onClick={handleCloseModal}
                     className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl"
                   >
                     Nueva reserva

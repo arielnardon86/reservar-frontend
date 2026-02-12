@@ -24,7 +24,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { format, startOfDay, isSameDay, isToday, addDays, subDays, parseISO } from "date-fns"
-import { toZonedTime } from "date-fns-tz"
+import { toZonedTime, format as formatTz } from "date-fns-tz"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
 import { AppointmentStatus } from "@/lib/api/types"
@@ -143,17 +143,19 @@ export function AppointmentsCalendar() {
     // Usar la zona horaria del tenant o default
     const timeZone = tenant?.timezone || 'America/Argentina/Buenos_Aires'
 
-    // Convertir UTC a la zona horaria del tenant para visualización correcta
-    const start = toZonedTime(appointment.startTime, timeZone)
-    const end = toZonedTime(appointment.endTime, timeZone)
+    // Convertir UTC a string en la zona horaria del tenant
+    // Usar formatTz para obtener la hora correcta sin depender del browser
+    const startTimeStr = formatTz(appointment.startTime, 'HH:mm', { timeZone })
+    const [startHour, startMin] = startTimeStr.split(':').map(Number)
 
-    // Usar hora local del navegador
-    const startHour = start.getHours()
-    const startMin = start.getMinutes()
-    const startTimeStr = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`
+    const endStr = formatTz(appointment.endTime, 'HH:mm', { timeZone })
+    const [endHour, endMin] = endStr.split(':').map(Number)
 
     const startSlot = timeToSlot(startTimeStr)
-    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+    // Calculate duration using UTC timestamps for accuracy
+    const startUtc = new Date(appointment.startTime);
+    const endUtc = new Date(appointment.endTime);
+    const durationMinutes = (endUtc.getTime() - startUtc.getTime()) / (1000 * 60)
     const durationSlots = durationMinutes / SLOT_DURATION
 
     const leftPercent = slotToPercent(startSlot)
@@ -169,10 +171,15 @@ export function AppointmentsCalendar() {
 
     appointments.forEach(apt => {
       const timeZone = tenant?.timezone || 'America/Argentina/Buenos_Aires'
-      const start = toZonedTime(apt.startTime, timeZone)
-      const end = toZonedTime(apt.endTime, timeZone)
-      const startSlot = timeToSlot(format(start, 'HH:mm'))
-      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+      // Calcular slots usando hora de edificio
+      const startTimeStr = formatTz(apt.startTime, 'HH:mm', { timeZone })
+      const startSlot = timeToSlot(startTimeStr)
+
+      // Duración en minutos (diferencia real de timestamps UTC es segura)
+      const startUtc = new Date(apt.startTime)
+      const endUtc = new Date(apt.endTime)
+      const durationMinutes = (endUtc.getTime() - startUtc.getTime()) / (1000 * 60)
+
       const endSlot = startSlot + (durationMinutes / SLOT_DURATION)
 
       blocks.push({ startSlot, endSlot })
@@ -355,12 +362,8 @@ export function AppointmentsCalendar() {
                     const isLongDuration = durationMinutes >= 90
 
                     // Formatear horas locales
-                    const startHour = start.getHours()
-                    const startMin = start.getMinutes()
-                    const endHour = end.getHours()
-                    const endMin = end.getMinutes()
-                    const startTimeFormatted = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`
-                    const endTimeFormatted = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`
+                    const startTimeFormatted = formatTz(apt.startTime, 'HH:mm', { timeZone })
+                    const endTimeFormatted = formatTz(apt.endTime, 'HH:mm', { timeZone })
 
                     return (
                       <div
@@ -515,13 +518,9 @@ export function AppointmentsCalendar() {
                   <p className="text-gray-900 mt-1">
                     {(() => {
                       const timeZone = tenant?.timezone || 'America/Argentina/Buenos_Aires'
-                      const start = toZonedTime(selectedAppointment.startTime, timeZone)
-                      const end = toZonedTime(selectedAppointment.endTime, timeZone)
-                      const startHour = start.getHours()
-                      const startMin = start.getMinutes()
-                      const endHour = end.getHours()
-                      const endMin = end.getMinutes()
-                      return `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')} - ${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`
+                      const startStr = formatTz(selectedAppointment.startTime, 'HH:mm', { timeZone })
+                      const endStr = formatTz(selectedAppointment.endTime, 'HH:mm', { timeZone })
+                      return `${startStr} - ${endStr}`
                     })()}
                   </p>
                 </div>
