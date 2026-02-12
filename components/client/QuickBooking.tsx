@@ -10,7 +10,6 @@ import {
   addDays,
   startOfDay,
   isSameDay,
-  min,
 } from "date-fns"
 import { toZonedTime, fromZonedTime } from "date-fns-tz"
 import { es } from "date-fns/locale"
@@ -92,7 +91,7 @@ function dateAtTimeInBuilding(date: Date, timeStr: string, timeZone: string): Da
 
 /** Convierte un ISO string a "HH:mm" en la zona del edificio. */
 function isoToBuildingTimeStr(isoString: string, timeZone: string): string {
-  return format(toZonedTime(isoString, timeZone), 'HH:mm')
+  return format(toZonedTime(new Date(isoString), timeZone), 'HH:mm')
 }
 
 const timeToSlot = (time: string): number => {
@@ -214,6 +213,14 @@ export function QuickBooking() {
             console.log(`[Availability] ${space.name} (${dateStr}): ${slotList.length} slots, ${availableCount} disponibles`, allTimes.slice(0, 5))
             if (allTimes.length >= 17) console.log(`[Availability] ${space.name} horarios 2º/3º bloque:`, allTimes[8], allTimes[16])
             const duration = space.duration ?? 30
+            // Diagnóstico: verificar slots 8 y 9 (2º bloque) y claves en mapa
+            if (slotList.length >= 10) {
+              const s8 = slotList[8] as TimeSlot | undefined
+              const s9 = slotList[9] as TimeSlot | undefined
+              const t8 = s8 ? normalizeTimeHHMM(String(s8.time)) : '?'
+              const t9 = s9 ? normalizeTimeHHMM(String(s9.time)) : '?'
+              console.log(`[Availability] ${space.name} slots[8,9]:`, s8?.time, s9?.time, '→ normalizado:', t8, t9)
+            }
             slotList.forEach((slot: TimeSlot) => {
               const timeNorm = normalizeTimeHHMM(String(slot?.time ?? ''))
               if (slot.available) {
@@ -325,6 +332,13 @@ export function QuickBooking() {
 
     if (availableSlots.length === 0) return []
 
+    // Diagnóstico: ¿slot 16 está disponible? (debería ser 16:00 para 2º bloque)
+    const check16 = isSlotTimeInMapAvailable(space.id, '16:00')
+    const check15 = isSlotTimeInMapAvailable(space.id, '15:00')
+    if (availableSlots.some(s => s >= 14 && s <= 18)) {
+      console.log(`[Availability] ${space.name} mapa 15:00=${check15} 16:00=${check16} | slot16 en availableSlots:`, availableSlots.includes(16))
+    }
+
     // Agrupar slots consecutivos en franjas
     const ranges: Array<{ start: number; end: number }> = []
     let currentRange: { start: number; end: number } | null = null
@@ -360,7 +374,12 @@ export function QuickBooking() {
                 !reserved.some(r => slotIdx >= r.startSlot && slotIdx < r.endSlot)
             }
           )
-          if (allAvailable) blocks.push({ startSlot, endSlot })
+          if (allAvailable) {
+            blocks.push({ startSlot, endSlot })
+            if (startSlot >= 14 && startSlot <= 18) {
+              console.log(`[Availability] ${space.name} bloque 2º:`, { startSlot, endSlot, muestra: `${slotToTime(startSlot)}–${slotToTime(endSlot)}` })
+            }
+          }
         }
       }
 
