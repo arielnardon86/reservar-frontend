@@ -166,7 +166,10 @@ export function QuickBooking() {
   const [showLegendHint, setShowLegendHint] = useState(false)
 
   const days = useMemo(() => generateDays(), [])
-  const activeSpaces = useMemo(() => services?.filter(s => s.isActive) || [], [services])
+  const activeSpaces = useMemo(
+    () => [...(services?.filter(s => s.isActive) || [])].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+    [services]
+  )
 
   const dateStr = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate])
   const { data: dayAppointmentsData } = useDayAppointments(tenantSlug, dateStr)
@@ -747,24 +750,25 @@ export function QuickBooking() {
                         >
                     {/* Franjas: verde = bloque disponible (duración del espacio), rojo = reservado, gris = no disponible */}
                     <div className="absolute inset-0">
-                      {/* Pintar fondo gris por defecto */}
+                      {/* Pintar fondo gris por defecto - alineado con grilla */}
                       {Array.from({ length: TOTAL_SLOTS }, (_, slotIndex) => {
                         const left = slotToPercent(slotIndex)
-                        const width = (1 / TOTAL_SLOTS) * 100
+                        const widthPercent = (1 / TOTAL_SLOTS) * 100
                         return (
                           <div
                             key={`bg-${slotIndex}`}
-                            className="absolute top-0 bottom-0"
+                            className="absolute top-0 bottom-0 box-border"
                             style={{
                               left: `${left}%`,
-                              width: `${width}%`,
+                              width: `${widthPercent}%`,
+                              boxSizing: 'border-box',
                               backgroundColor: 'rgb(51 65 85 / 0.65)',
                             }}
                           />
                         )
                       })}
 
-                      {/* Bloques disponibles como segmentos con separación visual */}
+                      {/* Bloques disponibles - posicionamiento exacto para encuadrar con la grilla */}
                       {getAvailableBlocksCached(space).map((block, idx) => {
                         const left = slotToPercent(block.startSlot)
                         const width = slotToPercent(block.endSlot) - slotToPercent(block.startSlot)
@@ -772,49 +776,45 @@ export function QuickBooking() {
                         const prevBlock = idx > 0 ? blocks[idx - 1] : null
                         const nextBlock = idx < blocks.length - 1 ? blocks[idx + 1] : null
 
-                        // Detectar si hay un gap antes o después de este bloque
+                        // Detectar si hay un gap antes o después de este bloque (solo para estilos)
                         const hasGapBefore = prevBlock ? (block.startSlot - prevBlock.endSlot) > 0 : false
                         const hasGapAfter = nextBlock ? (nextBlock.startSlot - block.endSlot) > 0 : false
 
                         return (
                           <div
                             key={`avail-${space.id}-${idx}`}
-                            className="absolute top-1 bottom-1 rounded-sm"
+                            className="absolute top-1 bottom-1 rounded-sm box-border"
                             style={{
                               left: `${left}%`,
                               width: `${width}%`,
+                              boxSizing: 'border-box',
                               backgroundColor: 'rgb(16 185 129 / 0.75)',
                               boxShadow: 'inset 0 0 0 1px rgba(6,95,70,0.9)',
-                              // Separación visual: siempre bordes oscuros para distinguir bloques
-                              // Si hay gap antes, el borde izquierdo será más visible
                               borderLeft: hasGapBefore || idx === 0
                                 ? '2px solid rgba(15,23,42,1)'
                                 : '1px solid rgba(6,95,70,0.5)',
-                              // Si hay gap después, el borde derecho será más visible
                               borderRight: hasGapAfter || idx === blocks.length - 1
                                 ? '2px solid rgba(15,23,42,1)'
                                 : '1px solid rgba(6,95,70,0.5)',
-                              // Margen para crear gap visual cuando hay separación real
-                              marginLeft: hasGapBefore ? '2px' : '0',
-                              marginRight: hasGapAfter ? '2px' : '0',
                             }}
                           />
                         )
                       })}
 
-                      {/* Slots reservados (rojo) - solo reservas reales, no horarios pasados */}
+                      {/* Slots reservados (rojo) - solo reservas reales, alineados con grilla */}
                       {Array.from({ length: TOTAL_SLOTS }, (_, slotIndex) => {
                         const status = getSlotStatus(space, slotIndex)
                         if (status !== 'reserved') return null
                         const left = slotToPercent(slotIndex)
-                        const width = (1 / TOTAL_SLOTS) * 100
+                        const widthPercent = (1 / TOTAL_SLOTS) * 100
                         return (
                           <div
                             key={`res-${slotIndex}`}
-                            className="absolute top-0 bottom-0"
+                            className="absolute top-0 bottom-0 box-border"
                             style={{
                               left: `${left}%`,
-                              width: `${width}%`,
+                              width: `${widthPercent}%`,
+                              boxSizing: 'border-box',
                               backgroundColor: 'rgb(239 68 68 / 0.85)',
                             }}
                           />
@@ -847,7 +847,7 @@ export function QuickBooking() {
                         <div
                           key={i}
                           className={cn(
-                            "absolute top-0 bottom-0 rounded-sm shadow-sm z-10",
+                            "absolute top-0 bottom-0 rounded-sm shadow-sm z-10 box-border",
                             isPast ? "border border-slate-600/80 bg-slate-500/70" : "border border-red-700/80 bg-red-500/90"
                           )}
                           style={{
@@ -867,10 +867,10 @@ export function QuickBooking() {
                       )
                     })}
 
-                    {/* Bloque seleccionado */}
+                    {/* Bloque seleccionado - alineado con grilla */}
                     {selectedBlock && (
                       <div
-                        className="absolute top-1 bottom-1 rounded border-2 border-emerald-400 bg-emerald-500/30 z-20"
+                        className="absolute top-1 bottom-1 rounded border-2 border-emerald-400 bg-emerald-500/30 z-20 box-border"
                         style={{
                           left: `${slotToPercent(selectedBlock.startSlot)}%`,
                           width: `${slotToPercent(selectedBlock.endSlot) - slotToPercent(selectedBlock.startSlot)}%`,
