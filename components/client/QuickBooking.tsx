@@ -688,69 +688,59 @@ export function QuickBooking() {
         </div>
       </div>
 
-      {/* Timeline - columna espacios fija, horarios scrolleables en móvil */}
+      {/* Timeline - cada fila = espacio + barras. Scroll horizontal para horarios, vertical en móvil para ver todos */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10 pb-24 md:pb-8">
-        <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col">
-          {/* Layout: columna izquierda fija (fuera del scroll) + área scrolleable */}
-          <div className="flex min-h-0">
-            {/* Columna espacios - fija, nunca scrollea */}
-            <div className="flex flex-col shrink-0 w-28 sm:w-48 border-r border-slate-700 bg-slate-800 z-10">
-              <div className="p-3 sm:p-4 border-b border-slate-700">
+        <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+          <div className="relative overflow-x-auto overflow-y-auto">
+            {/* Header: Espacios | 8 9 10 ... */}
+            <div className="flex border-b border-slate-700 bg-slate-800 min-w-max">
+              <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 sticky left-0 z-30 bg-slate-800">
                 <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Espacios</span>
               </div>
-              {activeSpaces.map((space) => (
-                <div
-                  key={space.id}
-                  className="p-3 sm:p-4 border-b border-slate-700 last:border-b-0 flex flex-col justify-center bg-slate-800/60 min-h-[56px] sm:min-h-[64px]"
-                >
-                  <div className="font-semibold text-white text-sm sm:text-base">{space.name}</div>
-                  {space.description && (
-                    <div className="text-[10px] sm:text-xs text-slate-300 mt-0.5 line-clamp-2" title={space.description}>{space.description}</div>
-                  )}
-                  <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{space.duration} min</div>
-                </div>
-              ))}
+              <div className="flex" style={{ minWidth: `${hours.length * 48}px` }}>
+                {hours.map((h) => (
+                  <div
+                    key={h}
+                    className="flex-1 min-w-[48px] p-2 sm:p-3 text-center text-xs sm:text-sm font-medium text-slate-400 border-r border-slate-700 last:border-r-0"
+                  >
+                    {h}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Área scrolleable - solo horarios */}
-            <div className="flex-1 overflow-x-auto min-w-0">
-              <div style={{ minWidth: `${hours.length * 48}px` }}>
-                {/* Header de horarios */}
-                <div className="flex border-b border-slate-700 bg-slate-800">
-                  {hours.map((h) => (
-                    <div
-                      key={h}
-                      className="flex-1 min-w-[48px] p-2 sm:p-3 text-center text-xs sm:text-sm font-medium text-slate-400 border-r border-slate-700 last:border-r-0"
-                    >
-                      {h}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="relative">
-                  {loadingAvailability && (
-                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-20 min-h-[200px]">
-                      <div className="w-8 h-8 border-3 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
-                    </div>
-                  )}
-
-                  {activeSpaces.map((space) => {
-                    const occupiedBlocks = getOccupiedBlocks(space.id)
-                    const isActive = activeSelection?.spaceId === space.id
-                    const selectedBlock = isActive && activeSelection ? getAvailableBlocksCached(space).find(b => b.startSlot === activeSelection.startSlot) : null
-                    return (
-                      <div
-                        key={space.id}
-                        className="flex border-b border-slate-700 last:border-b-0 bg-slate-800/60"
-                      >
-                        <div
-                          className="flex-1 h-14 sm:h-16 min-w-0 relative cursor-pointer select-none"
-                          style={{ minWidth: `${hours.length * 48}px` }}
-                          onClick={(e) => handleTimelineClick(space, e)}
-                        >
-                    {/* Franjas: verde = bloque disponible (duración del espacio), rojo = reservado, gris = no disponible */}
+            {/* Filas: una por espacio - nombre fijo sticky + timeline scrolleable */}
+            {loadingAvailability && (
+              <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-20 min-h-[200px] rounded-b-2xl">
+                <div className="w-8 h-8 border-3 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+              </div>
+            )}
+            {activeSpaces.map((space) => {
+              const occupiedBlocks = getOccupiedBlocks(space.id)
+              const isActive = activeSelection?.spaceId === space.id
+              const selectedBlock = isActive && activeSelection ? getAvailableBlocksCached(space).find(b => b.startSlot === activeSelection.startSlot) : null
+              return (
+                <div
+                  key={space.id}
+                  className="flex border-b border-slate-700 last:border-b-0 bg-slate-800/60 min-w-max"
+                >
+                  {/* Columna nombre - sticky en scroll horizontal */}
+                  <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 flex flex-col justify-center bg-slate-800 sticky left-0 z-20 shadow-[2px_0_4px_rgba(0,0,0,0.2)]">
+                    <div className="font-semibold text-white text-sm sm:text-base">{space.name}</div>
+                    {space.description && (
+                      <div className="text-[10px] sm:text-xs text-slate-300 mt-0.5 line-clamp-2" title={space.description}>{space.description}</div>
+                    )}
+                    <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{space.duration} min</div>
+                  </div>
+                  {/* Timeline de barras */}
+                  <div
+                    className="h-14 sm:h-16 flex-1 min-w-0 relative cursor-pointer select-none"
+                    style={{ minWidth: `${hours.length * 48}px` }}
+                    onClick={(e) => handleTimelineClick(space, e)}
+                  >
+                    {/* Franjas: verde = disponible, rojo = reservado, gris = pasado/no disp. */}
                     <div className="absolute inset-0">
-                      {/* Pintar fondo gris por defecto - alineado con grilla */}
+                      {/* Pintar fondo gris por defecto - cada slot de 30 min */}
                       {Array.from({ length: TOTAL_SLOTS }, (_, slotIndex) => {
                         const left = slotToPercent(slotIndex)
                         const widthPercent = (1 / TOTAL_SLOTS) * 100
@@ -877,14 +867,25 @@ export function QuickBooking() {
                         }}
                       />
                     )}
-                        </div>
-                      </div>
-                    )
-                  })}
+
+                    {/* Líneas verticales de grilla (cada hora) - encima de todo para evitar aspecto colapsado */}
+                    {hours.map((h, i) => (
+                      <div
+                        key={`grid-${space.id}-${h}`}
+                        className="absolute top-0 bottom-0 w-px bg-slate-500/80 pointer-events-none z-30"
+                        style={{ left: `${slotToPercent(i * 2)}%` }}
+                      />
+                    ))}
+                    <div
+                      className="absolute top-0 bottom-0 right-0 w-px bg-slate-500/80 pointer-events-none z-30"
+                      aria-hidden
+                    />
+                  </div>
                 </div>
-              </div>
-            </div>
+              )
+            })}
           </div>
+        </div>
 
           {/* Leyenda de colores - fija abajo en móvil (fixed para que no scrollee) */}
           <div className="fixed bottom-0 left-0 right-0 md:relative flex flex-wrap items-center justify-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 bg-slate-800 border-t border-slate-700 text-sm z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.3)] md:shadow-none">
