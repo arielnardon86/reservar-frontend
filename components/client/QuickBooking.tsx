@@ -32,6 +32,8 @@ import { toast } from "sonner"
 import { useQueryClient } from "@tanstack/react-query"
 import type { Service, TimeSlot, AppointmentStatus } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
+import { useIsMobile } from "@/lib/hooks/useMediaQuery"
+import { MobileSpacePicker } from "./MobileSpacePicker"
 
 // Constantes
 const HOUR_START = 8
@@ -143,6 +145,7 @@ const expandSlotToSegments = (startTime: string, durationMinutes: number, segmen
 export function QuickBooking() {
   const params = useParams()
   const router = useRouter()
+  const isMobile = useIsMobile()
   const tenantSlug = params?.tenantSlug as string
   const { tenant } = useTenantContext()
   const queryClient = useQueryClient()
@@ -410,6 +413,32 @@ export function QuickBooking() {
   }, [activeSpaces, selectedDate, availabilityMap, dayAppointments])
 
   const getAvailableBlocksCached = (space: Service) => availableBlocksBySpaceId[space.id] ?? []
+
+  // Datos para vista móvil (lista de slots - estilo turnero)
+  const mobileSpaceSlots = useMemo(() => {
+    const slots: Array<{ space: Service; block: { startSlot: number; endSlot: number } }> = []
+    activeSpaces.forEach((space) => {
+      const blocks = availableBlocksBySpaceId[space.id] ?? []
+      blocks.forEach((block) => {
+        slots.push({ space, block: { startSlot: block.startSlot, endSlot: block.endSlot } })
+      })
+    })
+    return slots
+  }, [activeSpaces, availableBlocksBySpaceId])
+
+  const handleMobileSlotSelect = (space: Service, block: { startSlot: number; endSlot: number }) => {
+    const startTime = getSlotTimeStr(block.startSlot)
+    const endTime = getSlotTimeStr(block.endSlot)
+    const durationMinutes = (block.endSlot - block.startSlot) * SLOT_DURATION
+    setSelectedSlot({
+      space,
+      date: selectedDate,
+      startTime,
+      endTime,
+      duration: durationMinutes,
+    })
+    setShowModal(true)
+  }
 
   const getAvailableBlockAtSlot = (space: Service, slotIndex: number): OccupiedBlock | null => {
     const blocks = getAvailableBlocksCached(space)
@@ -688,8 +717,26 @@ export function QuickBooking() {
         </div>
       </div>
 
-      {/* Timeline - cada fila = espacio + barras. Scroll horizontal para horarios, vertical en móvil para ver todos */}
+      {/* Móvil: lista de slots | Desktop: grilla timeline */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 relative z-10 pb-24 md:pb-8">
+        {isMobile ? (
+          /* Vista móvil - lista touch-friendly (estilo turnero) */
+          <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl min-h-[320px]">
+            <MobileSpacePicker
+              date={selectedDate}
+              spaceSlots={mobileSpaceSlots}
+              getSlotTimeStr={getSlotTimeStr}
+              onSelectSlot={handleMobileSlotSelect}
+              selectedSlot={selectedSlot ? { spaceId: selectedSlot.space.id, startSlot: timeToSlot(selectedSlot.startTime) } : null}
+              loading={loadingAvailability}
+              onShowHelp={() => setShowLegendHint(true)}
+            />
+            <p className="text-center text-xs text-slate-500 py-3 px-4 border-t border-slate-700">
+              Tocá en un horario para reservar
+            </p>
+          </div>
+        ) : (
+          /* Vista desktop - grilla timeline */
         <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
           <div className="relative overflow-x-auto overflow-y-auto">
             {/* Header: Espacios | 8 9 10 ... */}
@@ -885,10 +932,9 @@ export function QuickBooking() {
               )
             })}
           </div>
-        </div>
 
-          {/* Leyenda de colores - fija abajo en móvil (fixed para que no scrollee) */}
-          <div className="fixed bottom-0 left-0 right-0 md:relative flex flex-wrap items-center justify-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 bg-slate-800 border-t border-slate-700 text-sm z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.3)] md:shadow-none">
+          {/* Leyenda - solo desktop (móvil usa lista sin leyenda) */}
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 bg-slate-800 border-t border-slate-700 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-5 h-4 rounded bg-emerald-500/80" />
               <span className="text-slate-300">Disponible</span>
@@ -905,28 +951,23 @@ export function QuickBooking() {
               <div className="w-5 h-4 rounded bg-slate-600/80" />
               <span className="text-slate-300">No disp.</span>
             </div>
-            <button
-              onClick={() => setShowLegendHint(true)}
-              className="md:hidden ml-1 p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-700/50 transition-colors"
-              aria-label="Cómo reservar"
-            >
-              <Info className="w-4 h-4" />
-            </button>
+            <p className="text-slate-500 text-xs">Pasá el mouse para ver horarios · Tocá para reservar</p>
           </div>
         </div>
+        )}
       </div>
 
       {/* Modal de ayuda móvil - cómo reservar */}
-      {showLegendHint && (
+      {showLegendHint && isMobile && (
         <>
           <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowLegendHint(false)} />
-          <div className="fixed inset-x-4 bottom-24 z-50 bg-slate-800 border border-slate-600 rounded-xl p-4 shadow-xl md:hidden animate-in slide-in-from-bottom-4 duration-200">
+          <div className="fixed inset-x-4 bottom-24 z-50 bg-slate-800 border border-slate-600 rounded-xl p-4 shadow-xl animate-in slide-in-from-bottom-4 duration-200">
             <div className="flex items-start gap-3">
               <Info className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-white mb-1">Cómo reservar</p>
                 <p className="text-sm text-slate-300">
-                  Deslizá hacia la derecha para ver más horarios disponibles. Tocá en un bloque verde para elegir el turno y confirmar tu reserva.
+                  Seleccioná un horario de la lista, completá tus datos y confirmá la reserva.
                 </p>
                 <Button
                   size="sm"
