@@ -740,16 +740,22 @@ export function QuickBooking() {
           /* Vista desktop - grilla timeline */
         <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
           <div className="relative overflow-x-auto overflow-y-auto">
-            {/* Header: Espacios | 8 9 10 ... */}
+            {/* Header: Espacios | 11 12 13 ... (cada columna = 1 hora, etiqueta al inicio) */}
             <div className="flex border-b border-slate-700 bg-slate-800 min-w-max">
               <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 sticky left-0 z-30 bg-slate-800">
                 <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Espacios</span>
               </div>
-              <div className="flex" style={{ minWidth: `${hours.length * 40}px` }}>
+              <div
+                className="grid border-l border-slate-700"
+                style={{
+                  width: `${hours.length * 48}px`,
+                  gridTemplateColumns: `repeat(${hours.length}, 48px)`,
+                }}
+              >
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="flex-1 min-w-[40px] p-1.5 sm:p-2 text-center text-xs font-medium text-slate-400 border-r border-slate-700 last:border-r-0"
+                    className="pl-1.5 py-1.5 sm:py-2 text-left text-xs font-medium text-slate-400 border-r border-slate-700"
                   >
                     {h}
                   </div>
@@ -780,10 +786,10 @@ export function QuickBooking() {
                     )}
                     <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{space.duration} min</div>
                   </div>
-                  {/* Timeline de barras */}
+                  {/* Timeline de barras - mismo ancho fijo que header para alineación exacta */}
                   <div
-                    className="h-14 sm:h-16 flex-1 min-w-0 relative cursor-pointer select-none"
-                    style={{ minWidth: `${hours.length * 40}px` }}
+                    className="h-14 sm:h-16 shrink-0 relative cursor-pointer select-none"
+                    style={{ width: `${hours.length * 48}px` }}
                     onClick={(e) => handleTimelineClick(space, e)}
                   >
                     {/* Fondo unificado + bloques sin líneas divisorias */}
@@ -817,6 +823,11 @@ export function QuickBooking() {
                       const durationMinutes = durationSlots * SLOT_DURATION
                       const isPast = block.type === 'past'
 
+                      // Recortar bloques que empiezan antes del rango visible (ej. reserva 10:00 cuando grilla empieza 11:00)
+                      const renderStart = Math.max(0, block.startSlot)
+                      const renderEnd = Math.min(totalSlots, block.endSlot)
+                      if (renderStart >= renderEnd) return null
+
                       // Buscar el appointment correspondiente (solo para reservas reales)
                       let appointment: typeof dayAppointments[string][number] | undefined
                       if (!isPast) {
@@ -840,8 +851,8 @@ export function QuickBooking() {
                             isPast ? "border border-slate-600/80 bg-slate-500/70" : "border border-red-700/80 bg-red-500/90"
                           )}
                           style={{
-                            left: `${slotToPercent(block.startSlot)}%`,
-                            width: `${slotToPercent(block.endSlot) - slotToPercent(block.startSlot)}%`,
+                            left: `${slotToPercent(renderStart)}%`,
+                            width: `${slotToPercent(renderEnd) - slotToPercent(renderStart)}%`,
                           }}
                           title={appointment ? `${startTime} - ${endTime} (${durationMinutes} min)` : isPast ? 'Horario pasado' : `${startTime} - ${endTime}`}
                         >
