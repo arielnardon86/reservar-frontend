@@ -24,7 +24,7 @@ import {
   Mail,
   Info,
 } from "lucide-react"
-import { useServices, useDayAppointments } from "@/lib/api/hooks"
+import { useServices, useDayAppointments, useScheduleRange } from "@/lib/api/hooks"
 import { useTenantContext } from "@/lib/context/TenantContext"
 import { useParams, useRouter } from "next/navigation"
 import { appointmentsApi } from "@/lib/api/endpoints"
@@ -35,12 +35,8 @@ import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/lib/hooks/useMediaQuery"
 import { MobileSpacePicker } from "./MobileSpacePicker"
 
-// Constantes - 24 horas del día
-const HOUR_START = 0
-const HOUR_END = 24
-const TOTAL_HOURS = HOUR_END - HOUR_START
+// Constantes base
 const SLOT_DURATION = 30
-const TOTAL_SLOTS = (TOTAL_HOURS * 60) / SLOT_DURATION
 
 // Tipos: reserva por espacio común (sin profesional/recurso)
 interface BookingSelection {
@@ -74,12 +70,6 @@ const generateDays = () => {
   return days
 }
 
-const slotToTime = (slot: number): string => {
-  const totalMinutes = HOUR_START * 60 + slot * SLOT_DURATION
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
-}
 
 /** Medianoche del día dado en la zona del edificio, en ms UTC. */
 function midnightBuildingUtcMs(date: Date, timeZone: string): number {
@@ -98,15 +88,6 @@ function isoToBuildingTimeStr(isoString: string, timeZone: string): string {
   return format(toZonedTime(new Date(isoString), timeZone), 'HH:mm')
 }
 
-const timeToSlot = (time: string): number => {
-  const [h, m] = time.split(':').map(Number)
-  const totalMinutes = h * 60 + m
-  return (totalMinutes - HOUR_START * 60) / SLOT_DURATION
-}
-
-const slotToPercent = (slot: number): number => {
-  return (slot / TOTAL_SLOTS) * 100
-}
 
 const addMinutesToTime = (time: string, minutes: number): string => {
   const [h, m] = time.split(':').map(Number)
@@ -151,6 +132,26 @@ export function QuickBooking() {
   const queryClient = useQueryClient()
 
   const { data: services, isLoading: loadingServices } = useServices()
+  const { data: scheduleRange } = useScheduleRange(tenantSlug)
+
+  // Grilla según horario de turnos del edificio (fallback 0-24 si no hay schedules)
+  const hourStart = scheduleRange?.startHour ?? 0
+  const hourEnd = scheduleRange?.endHour ?? 24
+  const totalHours = hourEnd - hourStart
+  const totalSlots = (totalHours * 60) / SLOT_DURATION
+
+  const slotToTime = (slot: number): string => {
+    const totalMinutes = hourStart * 60 + slot * SLOT_DURATION
+    const h = Math.floor(totalMinutes / 60)
+    const m = totalMinutes % 60
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+  }
+  const timeToSlot = (time: string): number => {
+    const [h, m] = time.split(':').map(Number)
+    const totalMinutes = h * 60 + m
+    return (totalMinutes - hourStart * 60) / SLOT_DURATION
+  }
+  const slotToPercent = (slot: number): number => (slot / totalSlots) * 100
 
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()))
   const [availabilityMap, setAvailabilityMap] = useState<Map<string, boolean>>(new Map())
@@ -194,11 +195,11 @@ export function QuickBooking() {
 
   const hours = useMemo(() => {
     const h = []
-    for (let i = HOUR_START; i < HOUR_END; i++) {
+    for (let i = hourStart; i < hourEnd; i++) {
       h.push(i)
     }
     return h
-  }, [])
+  }, [hourStart, hourEnd])
 
   // Hora del slot: grid fijo 8–24, el backend ya devuelve horas en hora edificio (16:00, 20:00).
   // Usar slotToTime evita desfase por timezone; las etiquetas 8..23 son siempre hora del edificio.
@@ -291,7 +292,7 @@ export function QuickBooking() {
       blocks.push({ startSlot, endSlot, type: 'reserved' })
     })
     const pastSlots: number[] = []
-    for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
+    for (let slot = 0; slot < totalSlots; slot++) {
       if (isSlotInPast(slot)) {
         const isCovered = blocks.some(block => slot >= block.startSlot && slot < block.endSlot)
         if (!isCovered) pastSlots.push(slot)
@@ -317,13 +318,13 @@ export function QuickBooking() {
   // Bloques disponibles: misma duración que el espacio, detectando todas las franjas de disponibilidad
   const getAvailableBlocks = (space: Service): OccupiedBlock[] => {
     const durationSlots = Math.floor(space.duration / SLOT_DURATION)
-    if (durationSlots < 1 || durationSlots > TOTAL_SLOTS) return []
+    if (durationSlots < 1 || durationSlots > totalSlots) return []
     const reserved = getOccupiedBlocks(space.id)
     const blocks: OccupiedBlock[] = []
 
     // Encontrar todas las franjas de disponibilidad (slots consecutivos disponibles)
     const availableSlots: number[] = []
-    for (let s = 0; s < TOTAL_SLOTS; s++) {
+    for (let s = 0; s < totalSlots; s++) {
       if (isSlotInPast(s)) continue
       const timeStr = getSlotTimeStr(s)
       if (isSlotTimeInMapAvailable(space.id, timeStr)) {
@@ -410,7 +411,7 @@ export function QuickBooking() {
       map[space.id] = getAvailableBlocks(space)
     })
     return map
-  }, [activeSpaces, selectedDate, availabilityMap, dayAppointments])
+  }, [activeSpaces, selectedDate, availabilityMap, dayAppointments, totalSlots, hourStart])
 
   const getAvailableBlocksCached = (space: Service) => availableBlocksBySpaceId[space.id] ?? []
 
@@ -465,9 +466,9 @@ export function QuickBooking() {
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
     const percent = (x / rect.width) * 100
-    const rawSlot = (percent / 100) * TOTAL_SLOTS
+    const rawSlot = (percent / 100) * totalSlots
     const slot = Math.floor(rawSlot)
-    if (slot < 0 || slot >= TOTAL_SLOTS) return
+    if (slot < 0 || slot >= totalSlots) return
     const block = getAvailableBlockAtSlot(space, slot)
     if (!block) return
     if (activeSelection?.spaceId === space.id && activeSelection?.startSlot === block.startSlot) {

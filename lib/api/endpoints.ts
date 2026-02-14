@@ -48,6 +48,8 @@ export const tenantsApi = {
     apiClient.patch<Tenant>(`/tenants/${id}`, data),
   delete: (id: string) => apiClient.delete<void>(`/tenants/${id}`),
   getBySlug: (slug: string) => apiClient.get<Tenant>(`/tenants/slug/${slug}`),
+  getScheduleRange: (slug: string) =>
+    apiClient.get<{ startHour: number; endHour: number }>(`/tenants/slug/${slug}/schedule-range`),
 };
 
 // ============================================

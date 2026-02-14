@@ -55,6 +55,14 @@ export const useTenantBySlug = (slug: string) => {
   });
 };
 
+export const useScheduleRange = (slug: string) => {
+  return useQuery({
+    queryKey: ['tenants', 'slug', slug, 'schedule-range'],
+    queryFn: () => tenantsApi.getScheduleRange(slug),
+    enabled: !!slug,
+  });
+};
+
 export const useCreateTenant = () => {
   const queryClient = useQueryClient();
   return useMutation({
