@@ -740,22 +740,19 @@ export function QuickBooking() {
           /* Vista desktop - grilla timeline */
         <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
           <div className="relative overflow-x-auto overflow-y-auto">
-            {/* Header: Espacios | 11 12 13 ... (cada columna = 1 hora, etiqueta al inicio) */}
-            <div className="flex border-b border-slate-700 bg-slate-800 min-w-max">
+            {/* Header: Espacios | 11 12 13 ... - grilla ocupa exactamente el ancho de las horas (sin espacio vacío) */}
+            <div className="flex border-b border-slate-700 bg-slate-800 w-full">
               <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 sticky left-0 z-30 bg-slate-800">
                 <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Espacios</span>
               </div>
               <div
-                className="grid border-l border-slate-700"
-                style={{
-                  width: `${hours.length * 48}px`,
-                  gridTemplateColumns: `repeat(${hours.length}, 48px)`,
-                }}
+                className="flex flex-1 min-w-0 border-l border-slate-700"
+                style={{ minWidth: `${hours.length * 36}px` }}
               >
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="pl-1.5 py-1.5 sm:py-2 text-left text-xs font-medium text-slate-400 border-r border-slate-700"
+                    className="flex-1 min-w-[36px] pl-1.5 py-1.5 sm:py-2 text-left text-xs font-medium text-slate-400 border-r border-slate-700"
                   >
                     {h}
                   </div>
@@ -776,7 +773,7 @@ export function QuickBooking() {
               return (
                 <div
                   key={space.id}
-                  className="flex border-b border-slate-700 last:border-b-0 bg-slate-800/60 min-w-max"
+                  className="flex border-b border-slate-700 last:border-b-0 bg-slate-800/60 w-full"
                 >
                   {/* Columna nombre - sticky en scroll horizontal */}
                   <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 flex flex-col justify-center bg-slate-800 sticky left-0 z-20 shadow-[2px_0_4px_rgba(0,0,0,0.2)]">
@@ -786,10 +783,10 @@ export function QuickBooking() {
                     )}
                     <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{space.duration} min</div>
                   </div>
-                  {/* Timeline de barras - mismo ancho fijo que header para alineación exacta */}
+                  {/* Timeline de barras - mismo ancho que header (flex-1), sin espacio vacío a la derecha */}
                   <div
-                    className="h-14 sm:h-16 shrink-0 relative cursor-pointer select-none"
-                    style={{ width: `${hours.length * 48}px` }}
+                    className="h-14 sm:h-16 flex-1 min-w-0 relative cursor-pointer select-none"
+                    style={{ minWidth: `${hours.length * 36}px` }}
                     onClick={(e) => handleTimelineClick(space, e)}
                   >
                     {/* Fondo unificado + bloques sin líneas divisorias */}
