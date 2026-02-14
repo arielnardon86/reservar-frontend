@@ -35,8 +35,8 @@ import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/lib/hooks/useMediaQuery"
 import { MobileSpacePicker } from "./MobileSpacePicker"
 
-// Constantes
-const HOUR_START = 8
+// Constantes - 24 horas del día
+const HOUR_START = 0
 const HOUR_END = 24
 const TOTAL_HOURS = HOUR_END - HOUR_START
 const SLOT_DURATION = 30
@@ -744,11 +744,11 @@ export function QuickBooking() {
               <div className="w-32 sm:w-48 shrink-0 p-3 sm:p-4 border-r border-slate-700 sticky left-0 z-30 bg-slate-800">
                 <span className="text-xs font-semibold text-white/80 uppercase tracking-wider">Espacios</span>
               </div>
-              <div className="flex" style={{ minWidth: `${hours.length * 48}px` }}>
+              <div className="flex" style={{ minWidth: `${hours.length * 40}px` }}>
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="flex-1 min-w-[48px] p-2 sm:p-3 text-center text-xs sm:text-sm font-medium text-slate-400 border-r border-slate-700 last:border-r-0"
+                    className="flex-1 min-w-[40px] p-1.5 sm:p-2 text-center text-xs font-medium text-slate-400 border-r border-slate-700 last:border-r-0"
                   >
                     {h}
                   </div>
@@ -782,81 +782,32 @@ export function QuickBooking() {
                   {/* Timeline de barras */}
                   <div
                     className="h-14 sm:h-16 flex-1 min-w-0 relative cursor-pointer select-none"
-                    style={{ minWidth: `${hours.length * 48}px` }}
+                    style={{ minWidth: `${hours.length * 40}px` }}
                     onClick={(e) => handleTimelineClick(space, e)}
                   >
-                    {/* Franjas: verde = disponible, rojo = reservado, gris = pasado/no disp. */}
+                    {/* Fondo unificado + bloques sin líneas divisorias */}
                     <div className="absolute inset-0">
-                      {/* Pintar fondo gris por defecto - cada slot de 30 min */}
-                      {Array.from({ length: TOTAL_SLOTS }, (_, slotIndex) => {
-                        const left = slotToPercent(slotIndex)
-                        const widthPercent = (1 / TOTAL_SLOTS) * 100
-                        return (
-                          <div
-                            key={`bg-${slotIndex}`}
-                            className="absolute top-0 bottom-0 box-border"
-                            style={{
-                              left: `${left}%`,
-                              width: `${widthPercent}%`,
-                              boxSizing: 'border-box',
-                              backgroundColor: 'rgb(51 65 85 / 0.65)',
-                            }}
-                          />
-                        )
-                      })}
+                      {/* Fondo gris único (sin subdivisiones por hora) */}
+                      <div className="absolute inset-0 bg-slate-600/50 rounded-sm" />
 
-                      {/* Bloques disponibles - posicionamiento exacto para encuadrar con la grilla */}
+                      {/* Bloques disponibles - unificados, sin bordes internos */}
                       {getAvailableBlocksCached(space).map((block, idx) => {
                         const left = slotToPercent(block.startSlot)
                         const width = slotToPercent(block.endSlot) - slotToPercent(block.startSlot)
-                        const blocks = getAvailableBlocksCached(space)
-                        const prevBlock = idx > 0 ? blocks[idx - 1] : null
-                        const nextBlock = idx < blocks.length - 1 ? blocks[idx + 1] : null
-
-                        // Detectar si hay un gap antes o después de este bloque (solo para estilos)
-                        const hasGapBefore = prevBlock ? (block.startSlot - prevBlock.endSlot) > 0 : false
-                        const hasGapAfter = nextBlock ? (nextBlock.startSlot - block.endSlot) > 0 : false
-
                         return (
                           <div
                             key={`avail-${space.id}-${idx}`}
-                            className="absolute top-1 bottom-1 rounded-sm box-border"
+                            className="absolute top-0.5 bottom-0.5 rounded-sm"
                             style={{
                               left: `${left}%`,
                               width: `${width}%`,
                               boxSizing: 'border-box',
-                              backgroundColor: 'rgb(16 185 129 / 0.75)',
-                              boxShadow: 'inset 0 0 0 1px rgba(6,95,70,0.9)',
-                              borderLeft: hasGapBefore || idx === 0
-                                ? '2px solid rgba(15,23,42,1)'
-                                : '1px solid rgba(6,95,70,0.5)',
-                              borderRight: hasGapAfter || idx === blocks.length - 1
-                                ? '2px solid rgba(15,23,42,1)'
-                                : '1px solid rgba(6,95,70,0.5)',
+                              backgroundColor: 'rgb(16 185 129 / 0.8)',
                             }}
                           />
                         )
                       })}
 
-                      {/* Slots reservados (rojo) - solo reservas reales, alineados con grilla */}
-                      {Array.from({ length: TOTAL_SLOTS }, (_, slotIndex) => {
-                        const status = getSlotStatus(space, slotIndex)
-                        if (status !== 'reserved') return null
-                        const left = slotToPercent(slotIndex)
-                        const widthPercent = (1 / TOTAL_SLOTS) * 100
-                        return (
-                          <div
-                            key={`res-${slotIndex}`}
-                            className="absolute top-0 bottom-0 box-border"
-                            style={{
-                              left: `${left}%`,
-                              width: `${widthPercent}%`,
-                              boxSizing: 'border-box',
-                              backgroundColor: 'rgb(239 68 68 / 0.85)',
-                            }}
-                          />
-                        )
-                      })}
                     </div>
 
                     {/* Bloques ocupados - rojo = reserva real, gris = horario pasado */}
@@ -904,29 +855,16 @@ export function QuickBooking() {
                       )
                     })}
 
-                    {/* Bloque seleccionado - alineado con grilla */}
+                    {/* Bloque seleccionado */}
                     {selectedBlock && (
                       <div
-                        className="absolute top-1 bottom-1 rounded border-2 border-emerald-400 bg-emerald-500/30 z-20 box-border"
+                        className="absolute top-0.5 bottom-0.5 rounded border-2 border-emerald-400 bg-emerald-500/30 z-20"
                         style={{
                           left: `${slotToPercent(selectedBlock.startSlot)}%`,
                           width: `${slotToPercent(selectedBlock.endSlot) - slotToPercent(selectedBlock.startSlot)}%`,
                         }}
                       />
                     )}
-
-                    {/* Líneas verticales de grilla (cada hora) - encima de todo para evitar aspecto colapsado */}
-                    {hours.map((h, i) => (
-                      <div
-                        key={`grid-${space.id}-${h}`}
-                        className="absolute top-0 bottom-0 w-px bg-slate-500/80 pointer-events-none z-30"
-                        style={{ left: `${slotToPercent(i * 2)}%` }}
-                      />
-                    ))}
-                    <div
-                      className="absolute top-0 bottom-0 right-0 w-px bg-slate-500/80 pointer-events-none z-30"
-                      aria-hidden
-                    />
                   </div>
                 </div>
               )
